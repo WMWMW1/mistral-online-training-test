@@ -1,0 +1,52 @@
+Proximal Policy Optimization (PPO) is a popular algorithm in reinforcement learning, particularly known for its efficiency and simplicity. It's used for training deep neural networks to make decisions in environments, from playing games to controlling robots. The mathematical formulation of PPO is centered around optimizing a policy function, typically represented by a neural network. Here's a breakdown of its key components:
+
+### Policy Function
+
+- **Policy (π)**: A policy π is a function that maps a state \(s\) in the environment to a probability distribution over actions \(a\). In PPO, the policy is typically represented by a neural network.
+  
+  \[ \pi(a|s, \theta) \]
+  
+  Here, \(\theta\) represents the parameters (weights) of the neural network.
+
+### Objective Function
+
+PPO aims to maximize an objective function, which encourages the agent to take actions that lead to higher rewards. The objective function in PPO is carefully designed to balance exploration and exploitation.
+
+- **Expected Return**: The core objective is to maximize the expected return, which is the sum of rewards \(R_t\) obtained by following the policy π.
+
+  \[ J(\theta) = \mathbb{E}_{\pi_\theta}\left[ \sum_t R_t \right] \]
+
+### Clipped Surrogate Objective
+
+PPO introduces a novel objective function, known as the clipped surrogate objective, which prevents large policy updates that can destabilize training.
+
+- **Advantage Function (A)**: The advantage function measures how much better an action is compared to the average action at a given state. It's calculated as the difference between the Q-value (action-value function) and the V-value (value function).
+
+  \[ A_t = Q_t - V(s_t) \]
+
+- **Clipped Surrogate Objective**: This is the key innovation of PPO. It modifies the objective function to minimize the negative effects of large policy updates.
+
+  \[ L^{CLIP}(\theta) = \mathbb{E}_t \left[ \min(r_t(\theta) A_t, \text{clip}(r_t(\theta), 1 - \epsilon, 1 + \epsilon) A_t) \right] \]
+
+  Here, \(r_t(\theta)\) is the ratio of the new policy to the old policy:
+
+  \[ r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)} \]
+
+  and \(\epsilon\) is a hyperparameter that controls the clipping.
+
+### Optimization
+
+- **Stochastic Gradient Ascent**: The parameters of the policy network are updated using stochastic gradient ascent on the clipped objective.
+
+  \[ \theta_{new} = \theta_{old} + \alpha \nabla_\theta L^{CLIP}(\theta) \]
+
+  Here, \(\alpha\) is the learning rate.
+
+- **Actor-Critic Architecture**: PPO often uses an actor-critic architecture where the 'actor' updates the policy network, and the 'critic' estimates the value function.
+
+### Additional Techniques
+
+- **Multiple Epochs**: Unlike other policy gradient methods, PPO can run through the collected data multiple times (epochs) to perform updates, which makes it sample-efficient.
+- **Entropy Bonus**: Sometimes, an entropy term is added to the objective function to encourage exploration.
+
+PPO's balance between simplicity, sample efficiency, and robustness makes it a widely used algorithm in various reinforcement learning tasks.

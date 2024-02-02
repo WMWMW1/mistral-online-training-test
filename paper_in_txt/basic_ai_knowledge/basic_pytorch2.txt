@@ -1,0 +1,53 @@
+#### Tensor Indexing and Slicing
+- Just as in any other Python array, elements in a tensor can be accessed by index.
+  - The first element has index 0 and ranges are specified to include the first but before the last element.
+- As in standard Python lists, we can access elements according to their relative position to the end of the list by using negative indices.
+  - Example: `[-1]` selects the last element and `[1:3]` selects the second and the third elements as follows:
+
+```python
+x = torch.arange(20, dtype=torch.float32).reshape(5, 4)
+x[:, 1:3], x[-1, :], x[2:-1, :]
+```
+Output:
+```python
+(tensor([[ 1.,  2.],
+         [ 5.,  6.],
+         [ 9., 10.],
+         [13., 14.],
+         [17., 18.]]),
+tensor([16., 17., 18., 19.]),
+tensor([[ 8.,  9., 10., 11.],
+        [12., 13., 14., 15.]]))
+```
+
+#### Saving Memory
+- Running operations can cause new memory to be allocated to store the results.
+- We do not want to allocate memory unnecessarily all the time.
+  - In machine learning, we might have hundreds of megabytes of parameters where possible, we want to perform these updates in place.
+
+Code example for in-place operations:
+```python
+# In-place example
+x = torch.arange(20, dtype=torch.float32).reshape(5, 4)
+y = 10*x
+print(id(x), id(y))
+# operation not in-place
+y = x + y
+print(id(x), id(y))
+# operation in-place
+y += x  # or y.add_(x, alpha=1)
+print(id(x), id(y))
+```
+Output:
+```
+4906132176 4906163968
+4906132176 4905840256
+4906132176 4905840256
+```
+
+### Detailed Textual Description
+
+In the context of tensor indexing and slicing within the PyTorch library, it's noted that tensor elements can be accessed by their index, akin to standard Python arrays. The document explains that index 0 refers to the first element in a tensor, and that the specified range should include the starting index but not the ending index. It further highlights that negative indices can be utilized to reference elements from the end of the tensor, with `[-1]` targeting the last element. An example provided in the document demonstrates slicing to select different subsets of a tensor's elements, such as the second and third elements of each row.
+
+In the section on saving memory, the text discusses the importance of memory efficiency when running operations that generate new tensors. It points out the necessity to avoid unnecessary memory allocation, which is particularly relevant in machine learning where models can have large numbers of parameters occupying substantial memory space. To address this, the document recommends performing tensor updates 'in place' to conserve memory. The code example illustrates both non-in-place and in-place operations, with the latter shown to retain the same memory address, indicating no additional memory is allocated for the result. This is evidenced by the `id` function output, which remains unchanged for the in-place operation. 
+

@@ -1,0 +1,224 @@
+The provided text outlines various functions in the `torch.nn.functional` module of PyTorch, a popular deep learning library. These functions are categorized into different groups based on their functionality: Convolution functions, Pooling functions, Attention Mechanisms, Non-linear activation functions, Linear functions, Dropout functions, Sparse functions, Distance functions, Loss functions, Vision functions, and DataParallel functions. I will enhance the detail of each category and ensure all mathematical expressions are formatted with `$$`.
+
+### Convolution Functions
+1. **conv1d**: Applies a 1D convolution over an input signal consisting of multiple input planes.
+2. **conv2d**: Performs a 2D convolution on an input image with several input planes.
+3. **conv3d**: Executes a 3D convolution on an input image with multiple input planes.
+4. **conv_transpose1d**: Implements a 1D transposed convolution (sometimes called deconvolution) over an input signal with multiple input planes.
+5. **conv_transpose2d**: Applies a 2D transposed convolution on an input image with several input planes.
+6. **conv_transpose3d**: Executes a 3D transposed convolution on an input image with multiple input planes.
+7. **unfold**: Extracts sliding local blocks from a batched input tensor.
+8. **fold**: Combines an array of sliding local blocks into a larger containing tensor.
+
+### Pooling Functions
+1. **avg_pool1d**: Applies 1D average pooling over an input signal with several input planes.
+2. **avg_pool2d**: Performs 2D average pooling in $$kH \times kW$$ regions with $$sH \times sW$$ step size.
+3. **avg_pool3d**: Executes 3D average pooling in $$kT \times kH \times kW$$ regions with $$sT \times sH \times sW$$ step size.
+4. **max_pool1d**: Applies 1D max pooling over an input signal with multiple input planes.
+5. **max_pool2d**: Implements 2D max pooling over an input signal with multiple input planes.
+6. **max_pool3d**: Executes 3D max pooling over an input signal with several input planes.
+7. **max_unpool1d**: Partially reverses the effect of MaxPool1d.
+8. **max_unpool2d**: Partially reverses the effect of MaxPool2d.
+9. **max_unpool3d**: Partially reverses the effect of MaxPool3d.
+10. **lp_pool1d**: Applies 1D power-average pooling over an input signal with multiple input planes.
+11. **lp_pool2d**: Implements 2D power-average pooling over an input signal with several input planes.
+12. **adaptive_max_pool1d**: Performs 1D adaptive max pooling on an input signal with multiple input planes.
+13. **adaptive_max_pool2d**: Applies 2D adaptive max pooling on an input signal with several input planes.
+14. **adaptive_max_pool3d**: Executes 3D adaptive max pooling on an input signal with multiple input planes.
+15. **adaptive_avg_pool1d**: Applies 1D adaptive average pooling over an input signal with several input planes.
+16. **adaptive_avg_pool2d**: Implements 2D adaptive average pooling over an input signal with multiple input planes.
+17. **adaptive_avg_pool3d**: Performs 3D adaptive average pooling over an input signal with several input planes.
+18. **fractional_max_pool2d**: Applies 2D fractional max pooling over an input signal with multiple input planes.
+19. **fractional_max_pool3d**: Implements 3D fractional max pooling over an input signal with several input planes.
+
+### Attention Mechanisms
+1. **scaled_dot_product_attention**: Computes scaled dot product attention on query, key, and value tensors, using an optional attention mask if provided, and applying dropout if a probability greater than 0.0 is specified.
+
+### Non-linear Activation Functions
+1. **threshold**: Applies a threshold to each element of the input tensor.
+2. **threshold_**: In-place version of `threshold()`.
+3. **relu**: Applies the rectified linear unit function element-wise.
+4. **relu_**: In-place version of `relu()`.
+5. **hardtanh**: Applies the HardTanh function element-wise.
+6. **hardtanh_**: In-place version of `hardtanh()`.
+7. **hardswish**: Applies the hardswish function element-wise.
+8. **relu6**: Applies the element-wise function $$\text{ReLU6}(x) = \min(\max(0, x), 6)$$.
+9. **elu**: Applies the Exponential Linear Unit (ELU) function element-wise.
+10. **elu_**: In-place version of `elu()`.
+11. **selu**: Applies the element-wise SELU function, $$\text{SELU}(x) = \text{scale} \times (\max(0, x) + \min(0, \alpha \times (\exp(x) - 1)))$$, with $$\alpha = 1.6732632423543772848170429916717$$ and $$\text{scale} = 1.0507009873554804934193349852946$$.
+12. **celu**: Applies element-wise, $$\text{CELU}(x) = \max(0, x) + \min(0, \alpha \times (\exp(x/\alpha) - 1))$$.
+13. **leaky_relu**: Applies element-wise, $$\text{LeakyReLU}(x) = \max(0, x) + \text{negative_slope} \times \min(0, x)$$.
+14. **leaky_relu_**: In-place version of `leaky_relu()`.
+15. **prelu**: Applies element-wise the function $$\text{PReLU}(x) = \max(0, x) + \text{weight} \times \min(0, x)$$, where weight is a learnable parameter.
+16. **rrelu**: Randomized leaky ReLU.
+17. **rrelu_**: In-place version of `rrelu()`.
+18. **glu**: The gated linear unit.
+19. **gelu**: Applies the GELU function element-wise, $$\text{GELU}(x) = x \times \Phi(x)$$, where Φ is the cumulative distribution function of the standard normal distribution.
+20. **logsigmoid**: Applies element-wise $$\text{LogSigmoid}(x_i) = \log(\frac{1}{1 + \exp(-x_i)})$$.
+21. **hardshrink**: Applies the hard shrinkage function element-wise.
+22. **tanhshrink**: Applies element-wise, $$\text{Tanhshrink}(x) = x - \tanh(x)$$.
+23. **softsign**: Applies element-wise, $$\text{SoftSign}(x) = \frac{x}{1 + |x|}$$.
+24. **softplus**: Applies element-wise, $$\text{Softplus}(x) = \frac{1}{\beta} \times \log(1 + \exp(\beta \times x))$$.
+25. **softmin**: Applies
+
+ a softmin function.
+26. **softmax**: Applies a softmax function.
+27. **softshrink**: Applies the soft shrinkage function elementwise.
+28. **gumbel_softmax**: Samples from the Gumbel-Softmax distribution and optionally discretizes.
+29. **log_softmax**: Applies a softmax followed by a logarithm.
+30. **tanh**: Applies element-wise $$\text{Tanh}(x) = \frac{\exp(x) - \exp(-x)}{\exp(x) + \exp(-x)}$$.
+31. **sigmoid**: Applies the element-wise function $$\text{Sigmoid}(x) = \frac{1}{1 + \exp(-x)}$$.
+32. **hardsigmoid**: Applies the Hardsigmoid function element-wise.
+33. **silu**: Applies the Sigmoid Linear Unit (SiLU) function, element-wise.
+34. **mish**: Applies the Mish function, element-wise.
+
+### Linear Functions
+1. **linear**: Applies a linear transformation to the incoming data: $$y = xA^T + b$$.
+2. **bilinear**: Applies a bilinear transformation to the incoming data: $$y = x_1^TAx_2 + b$$.
+
+### Dropout Functions
+1. **dropout**: During training, randomly zeroes some elements of the input tensor with probability `p`.
+2. **alpha_dropout**: Applies alpha dropout to the input.
+3. **feature_alpha_dropout**: Randomly masks out entire channels (a channel is a feature map).
+4. **dropout1d**: Randomly zeroes out entire channels (a channel is a 1D feature map).
+5. **dropout2d**: Randomly zeroes out entire channels (a channel is a 2D feature map).
+6. **dropout3d**: Randomly zeroes out entire channels (a channel is a 3D feature map).
+
+### Sparse Functions
+1. **embedding**: Generates a simple lookup table that looks up embeddings in a fixed dictionary and size.
+2. **embedding_bag**: Computes sums, means, or maxes of bags of embeddings.
+3. **one_hot**: Takes a LongTensor with index values and returns a tensor that has zeros everywhere except where the index of the last dimension matches the corresponding value of the input tensor, in which case it will be 1.
+
+### Distance Functions
+1. **pairwise_distance**: Computes the pairwise distance between every pair of row vectors in the input.
+2. **cosine_similarity**: Returns cosine similarity between `x1` and `x2`, computed along a specified dimension.
+3. **pdist**: Computes the p-norm distance between every pair of row vectors in the input.
+
+### Loss Functions
+1. **binary_cross_entropy**: Measures the Binary Cross Entropy between the target and input probabilities.
+2. **binary_cross_entropy_with_logits**: Calculates Binary Cross Entropy between target and input logits.
+3. **poisson_nll_loss**: Poisson negative log likelihood loss.
+4. **cosine_embedding_loss**: Computes the cosine embedding loss between two tensors.
+5. **cross_entropy**: Computes the cross entropy loss between input logits and target.
+6. **ctc_loss**: Applies the Connectionist Temporal Classification loss.
+7. **gaussian_nll_loss**: Gaussian negative log likelihood loss.
+8. **hinge_embedding_loss**: Computes the hinge embedding loss.
+9. **kl_div**: Computes the Kullback-Leibler divergence loss.
+10. **l1_loss**: Computes the mean element-wise absolute value difference.
+11. **mse_loss**: Measures the element-wise mean squared error.
+12. **margin_ranking_loss**: Computes the margin ranking loss.
+13. **multilabel_margin_loss**: Computes the multilabel margin loss.
+14. **multilabel_soft_margin_loss**: Computes the multilabel soft margin loss.
+15. **multi_margin_loss**: Computes the multi margin loss.
+16. **nll_loss**: Computes the negative log likelihood loss.
+17. **huber_loss**: Computes the Huber loss.
+18. **smooth_l1_loss**: Computes the Smooth L1 loss.
+19. **soft_margin_loss**: Computes the soft margin loss.
+20. **triplet_margin_loss**: Computes the triplet margin loss between input tensors and a margin greater than 0.
+21. **triplet_margin_with_distance_loss**: Computes the triplet margin loss using a custom distance function.
+
+### Vision Functions
+1. **pixel_shuffle**: Rearranges elements in a tensor of shape $(*, C \times r^2, H, W)$ to a tensor of shape $(*, C, H \times r, W \times r)$, where `r` is the upscale factor.
+2. **pixel_unshuffle**: Reverses the PixelShuffle operation by rearranging elements in a tensor of shape $(*, C, H \times r, W \times r)$ to a tensor of shape $(*, C \times r^2, H, W)$, where `r` is the downscale factor.
+3. **pad**: Pads a tensor.
+4. **interpolate**: Down/up samples the input.
+5. **upsample**: Upsamples the input.
+6. **upsample_nearest**: Upsamples the input using nearest neighbors' pixel values.
+7. **upsample_bilinear**: Upsamples the input using bilinear upsampling.
+8. **grid_sample**: Computes grid sample.
+9. **affine_grid**: Generates a 2D or 3D flow field (sampling grid), given a batch of affine matrices theta.
+
+### DataParallel Functions (Multi-GPU, Distributed)
+1. **data_parallel**: Evaluates a module(input) in parallel across the GPUs given in `device_ids`.
+
+
+
+Providing detailed example usage for every function listed would be quite extensive, so I'll provide concise examples for each category. Remember, these are basic examples to illustrate the usage; in practice, parameters and context may vary based on your specific application.
+
+### Convolution Functions
+1. **conv1d**:
+   ```python
+   input = torch.randn(20, 16, 50)
+   weight = torch.randn(33, 16, 5)
+   output = F.conv1d(input, weight)
+   ```
+
+### Pooling Functions
+1. **avg_pool2d**:
+   ```python
+   input = torch.randn(20, 16, 50, 32)
+   output = F.avg_pool2d(input, kernel_size=3, stride=2)
+   ```
+
+### Attention Mechanisms
+1. **scaled_dot_product_attention**:
+   ```python
+   query = torch.randn(16, 49, 512)
+   key = torch.randn(16, 49, 512)
+   value = torch.randn(16, 49, 512)
+   output, attn = F.scaled_dot_product_attention(query, key, value)
+   ```
+
+### Non-linear Activation Functions
+1. **relu**:
+   ```python
+   input = torch.randn(2)
+   output = F.relu(input)
+   ```
+
+### Linear Functions
+1. **linear**:
+   ```python
+   input = torch.randn(128, 20)
+   weight = torch.randn(30, 20)
+   bias = torch.randn(30)
+   output = F.linear(input, weight, bias)
+   ```
+
+### Dropout Functions
+1. **dropout**:
+   ```python
+   input = torch.randn(20, 16)
+   output = F.dropout(input, p=0.5, training=True)
+   ```
+
+### Sparse Functions
+1. **embedding**:
+   ```python
+   embedding_matrix = torch.randn(10, 3)
+   indices = torch.LongTensor([1, 2, 4, 5])
+   output = F.embedding(indices, embedding_matrix)
+   ```
+
+### Distance Functions
+1. **cosine_similarity**:
+   ```python
+   input1 = torch.randn(100, 128)
+   input2 = torch.randn(100, 128)
+   output = F.cosine_similarity(input1, input2, dim=1)
+   ```
+
+### Loss Functions
+1. **cross_entropy**:
+   ```python
+   input = torch.randn(3, 5, requires_grad=True)
+   target = torch.empty(3, dtype=torch.long).random_(5)
+   output = F.cross_entropy(input, target)
+   ```
+
+### Vision Functions
+1. **pixel_shuffle**:
+   ```python
+   input = torch.randn(1, 9, 4, 4)
+   output = F.pixel_shuffle(input, upscale_factor=3)
+   ```
+
+### DataParallel Functions (Multi-GPU, Distributed)
+1. **data_parallel**:
+   ```python
+   module = MyModule()
+   input = torch.randn(20, 16, 50)
+   output = nn.parallel.data_parallel(module, input, device_ids=[0, 1])
+   ```
+
+Each of these examples is a starting point to understand how these functions are typically used. The actual implementation in your projects may require adjusting parameters and considering the context of your data and model architecture.

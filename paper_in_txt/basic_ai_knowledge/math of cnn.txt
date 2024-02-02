@@ -1,0 +1,59 @@
+Convolutional Neural Networks (CNNs) are a type of deep learning model primarily used in image recognition and processing. They are particularly adept at capturing spatial and temporal dependencies in an image through the application of relevant filters. The architecture of a CNN allows it to automatically and adaptively learn spatial hierarchies of features from input images.
+
+Here is a basic overview of the mathematics and components involved in a CNN:
+
+### 1. Convolutional Layer
+
+The convolutional layer is the core building block of a CNN. The layer's parameters consist of a set of learnable filters (or kernels), which have a small receptive field, but extend through the full depth of the input volume. For each filter, the convolution operation is performed between the filter and the input image to produce a feature map.
+
+The mathematical operation for a single filter is given by:
+
+\[ (I * K)(i, j) = \sum_m \sum_n I(m, n) \cdot K(i-m, j-n) \]
+
+Where:
+- \( I \) is the input image.
+- \( K \) is the kernel/filter.
+- \( * \) denotes the convolution operation.
+- \( (i, j) \) are the coordinates of the output feature map.
+
+### 2. Activation Function
+
+After the convolution operation, an activation function is applied to introduce non-linearity into the model. A common activation function is the Rectified Linear Unit (ReLU):
+
+\[ f(x) = \max(0, x) \]
+
+### 3. Pooling (Subsampling) Layer
+
+Pooling layers are used to reduce the spatial dimensions (width and height) of the input volume for the next convolutional layer. It reduces the number of parameters, controlling overfitting. The most common form is max pooling:
+
+\[ P(i, j) = \max_{m,n \in \text{window}} I(m, n) \]
+
+Where:
+- \( P \) is the output after pooling.
+- \( I \) is the input.
+- The max operation is taken over a window of the input.
+
+### 4. Fully Connected Layer
+
+After several convolutional and pooling layers, the high-level reasoning in the neural network is done via fully connected layers. Neurons in a fully connected layer have full connections to all activations in the previous layer. This part is typically similar to a regular neural network.
+
+The operation in a fully connected layer is:
+
+\[ O = \text{activation}(W \cdot X + b) \]
+
+Where:
+- \( O \) is the output.
+- \( W \) and \( b \) are the weights and biases.
+- \( X \) is the input from the previous layer.
+- The activation function (like ReLU, softmax, etc.) is applied to the linear transformation.
+
+### 5. Output Layer
+
+The last fully connected layer is the output layer. In classification tasks, it uses the softmax function (for multi-class problems) to output probabilities of the classes:
+
+\[ \text{softmax}(z_i) = \frac{e^{z_i}}{\sum_{j=1}^K e^{z_j}} \]
+
+For each class \( i \), \( z_i \) is the input to the softmax function, and \( K \) is the number of classes.
+
+This is a high-level overview of the math behind CNNs. Each of these steps involves more detailed calculations and considerations, especially when designing and training a model for specific tasks.
+
