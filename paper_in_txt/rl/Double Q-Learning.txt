@@ -1,0 +1,189 @@
+Performing Deep Recurrent Double Q-Learning for
+Atari Games
+Felipe Moreno-Vera
+Universidad Catolica San Pablo ´
+Arequipa, Peru´
+felipe.moreno@ucsp.edu.pe
+Abstract—Currently, many applications in Machine Learning
+are based on defining new models to extract more information
+about data, In this case Deep Reinforcement Learning with the
+most common application in video games like Atari, Mario, and
+others causes an impact in how to computers can learning by
+himself with only information called rewards obtained from any
+action. There is a lot of algorithms modeled and implemented
+based on Deep Recurrent Q-Learning proposed by DeepMind
+used in AlphaZero and Go. In this document, we proposed
+deep recurrent double Q-learning that is an improvement of
+the algorithms Double Q-Learning algorithms and Recurrent
+Networks like LSTM and DRQN.
+Index Terms—Deep Reinforcement Learning, Double QLearning, Recurrent Q-Learning, Reinforcement Learning, Atari
+Games, DQN, DRQN, DDQN
+I. INTRODUCTION
+Currently, there is an increase in the number in of applications in Reinforcement Learning. One recently application
+of Deep Reinforcement Learning (DRL) is self-driving cars
+[1], [2], another one is in games like AlphaZero (Go, Chess,
+etc) and video games like Mario, Top racer, Atari, etc. Deep
+Reinforcement Learning is considered as a third model in Machine Learning (with Supervised Learning and Unsupervised
+Learning) with a different learning model and architecture.
+There are several methods of implementing these learning
+processes, where Q-Learning is a prominent algorithm, the
+Q value of a pair (state, action) contains the sum of all these
+possible rewards. The problem is that this sum could be infinite
+in case there is no terminal state to reach and, in addition, we
+may not want to give the same weight to immediate rewards as
+to future rewards, in which case use is made of what is called
+an accumulated reinforcement with discount: future rewards
+are multiplied by a factor γ [0, 1] so that the higher this
+factor, the more influence future rewards have on the Q value
+of the pair analyzed.
+II. BACKGROUND
+Sutton et al. [3], [4] define various models to describe
+Reinforcement Learning and how to understand it. DeepMind
+was the first to achieve this Deep Learning with AlphaZero
+and Go game using Reinforcement Learning with Deep QLearning (DQN) [5] and Deep Recurrent Q-Leaning (DRQN)
+[6], follow up by OpenAI who recently surpassed professional
+players in StarCraft 2 (Gramve created by Blizzard) and
+978-1-7281-5666-8/19/$31.00 2019 IEEE
+previously in Dota 2 developed by Valve. Chen et al. [7]
+proposed a CNN based on DRQN using Recurrent Networks (a
+little variance of DRQN model using LSTM, the first neural
+network architecture that introduces the concept of memory
+cell [8], on agents actions to extract more information from
+frames.
+A. Deep Q-Learning (DQN)
+The first algorithm proposed by DeepMind was Deep QLearning, based on Q-Learning with experience replay [5],
+with this technique they save the last N experience tuples in
+replay memory. This approach is in some respects limited since
+the memory buffer does not differentiate important transitions
+and always overwrites with recent transitions due to the finite
+memory size N.
+Fig. 1. Deep Mind DQN algorithm with experience replay [5].
+B. Deep Double Q-Learning (DDQN)
+Hado et al. [5] propose the idea of Double Q-learning is to
+reduce overestimation by decomposing the max operation in
+the target into action selection and action evaluation.
+• DQN Model:
+Yt = Rt+1 + γmaxQ(St+1; at; θt)
+• DDQN Model:
+Yt = Rt+1 + γQ(St+1; argmaxQ(St+1; at; θt); θ
+1
+t
+)
+Where:
+• • at represents the agent.
+• • θt are the parameters of the network.
+arXiv:1908.06040v2 [cs.LG] 17 Oct 2019
+• • Q is the vector of action values.
+• • Yt is the target updated resembles stochastic gradient
+descent.
+• • γ is the discount factor that trades off the importance
+of immediate and later rewards.
+• • St is the vector of states.
+• • Rt+1 is the reward obtained after each action.
+C. Deep Recurrent Q-Learning (DRQN)
+Mathew et al. [6] have been shown to be capable of learning
+human-level control policies on a variety of different Atari
+2600 games. So they propose a DRQN algorithm which
+convolves three times over a single-channel image of the
+game screen. The resulting activation functions are processed
+through time by an LSTM layer (see Fig.2.
+Fig. 2. Deep Q-Learning with Recurrent Neural Networks model Deep
+Recurrent Q-Learning model (DQRN) [6]
+D. Deep Q-Learning with Recurrent Neural Networks
+(DQRNN)
+Chen et al. [7] say DQN is limited, so they try to improve
+the behavior of the network using Recurrent networks (DRQN)
+using LSTM in the networks to take better advantage of the
+experience generated in each action (see Fig.3).
+III. PROPOSED MODEL
+We implement the CNN proposed by Chen et al. [7] with
+some variations in the last layers and using ADAM error. The
+first attempt was a simple CNN with 3 Conv 2D layers, with
+the Q-Learning algorithm, we obtain a slow learning process
+for easy games like SpaceInvaders or Pong and very low
+accuracy in complicated games like Beam Rider or Enduro.
+Then, we try modifying using Dense 512 and 128 networks at
+the last layer with linear activation and relu, adding an LSTM
+layer with activation tanh.
+Fig. 3. Deep Q-Learning with Recurrent Neural Networks model (DQRN)
+[7].
+In table II we present our Hyperparameters using in our
+models, we denote this list of hyperparameters as the better
+set (in our case). We run models over an NVIDIA GeForce
+GTX 950 with Memory 1954MiB using Tensorflow, Keras
+and GYM (Atari library) for python. We implement DDQN,
+DRQN, DQN and our proposed to combine DRQN with
+Double Q-Learning [9] algorithm using LSTM.
+Conv 2D, 32
+(8x8), stride = 4
+Conv 2D, 64
+(4x4), stride = 2
+Dense(512, relu)
+Dense(actions, linear)
+Conv 2D, 64
+(3x3), stride = 1
+Convolutional Network
+Conv 2D, 32
+(8x8), stride
+= 4
+Conv 2D, 64
+(4x4), stride
+= 2
+Conv 2D, 64
+(3x3), stride
+= 1
+LSTM(512,
+tanh)
+Dense(128,
+relu)
+Dense(actions, linear)
+Recurrent Convolutional Network
+Fig. 4. Convolutional Networks proposed in our models.
+IV. EXPERIMENTS AND RESULTS
+Our experiments are built over Atari Learning Environment
+(ALE) [10] which serves us as an evaluation platform for our
+algorithm in the games SpaceInvaders, Enduro, Beam Rider,
+and Pong and allow us to compare with DQN (Double QLearning), DDQN (Deep Double Q-Learning), and DRQN
+(Deep Recurrent Q-Learning). After to run our algorithms
+using 10M (10 million) episodes, we obtain results for each
+model in each respective game. We get the best scores for the
+4 games mentioned above (See Table I).
+TABLE I
+RESULTS SCORES OF SPACE INVADERS, ENDURO, PONG AND BEAM
+RIDER.
+Models and respective Scores
+Model SpaceInvaders Enduro Pong Beam Rider
+DQN 1450 1095 65 349
+DRQN 1680 885 39 594
+DDQN 2230 1283 44 167
+DRDQN 2450 1698 74 876
+We compare with Volodymyr et al. [11] Letter about best
+scores form games obtained by DQN agents and professionals
+gamers (humans) to verify correct behavior of learning process, we measure accuracy based on Q-tables from the agent
+and DL algorithm (Double Q-Learning) extracting information
+from frames with the Convolutional Neural Networks (See Fig.
+5, and Fig.6).
+Fig. 5. DDQN Accuracy.
+CONCLUSIONS
+We present a model based on DRQN and Double QLearning combined to get a better performance in some games,
+using LSTM and CNN to analyze frames. We notice that each
+method could be good for a set of specific Atari games and
+other similar games but not for all. Some kind of sets of
+games can be improved using different CNN and get more
+information from the frames in each batch iteration. In this
+work, we determine which one can be improved with the
+techniques of Deep Recurrent Double Q-Learning and which
+can be group based on which learning algorithm improve their
+scores.
+FUTURE WORKS
+With these results, we notice that every game in atari has
+a similar behavior to others different games, but because of
+technical details and our equipment, we could not determine
+which games haves similar behavior but we encourage to do it
+and get all set of similar behaviors and verify which methods
+should help to improve the learning process per each game.
+ACKNOWLEDGMENT
+This work was supported by grant 234-2015-FONDECYT
+(Master Program) from CienciActiva of the National Council for Science,Technology and Technological Innovation
+(CONCYTEC-PERU).
+Fig. 6. DRDQN Accuracy

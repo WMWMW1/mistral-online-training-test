@@ -1,0 +1,2153 @@
+The Ideal Continual Learner: An Agent That Never Forgets
+Liangzu Peng 1 2 Paris V. Giampouras 1 Rene Vidal ´
+2 3
+Abstract
+The goal of continual learning is to find a model
+that solves multiple learning tasks which are presented sequentially to the learner. A key challenge in this setting is that the learner may forget
+how to solve a previous task when learning a new
+task, a phenomenon known as catastrophic forgetting. To address this challenge, many practical
+methods have been proposed, including memorybased, regularization-based, and expansion-based
+methods. However, a rigorous theoretical understanding of these methods remains elusive. This
+paper aims to bridge this gap between theory and
+practice by proposing a new continual learning
+framework called Ideal Continual Learner (ICL),
+which is guaranteed to avoid catastrophic forgetting by construction. We show that ICL unifies
+multiple well-established continual learning methods and gives new theoretical insights into the
+strengths and weaknesses of these methods. We
+also derive generalization bounds for ICL which
+allow us to theoretically quantify how rehearsal
+affects generalization. Finally, we connect ICL
+to several classic subjects and research topics of
+modern interest, which allows us to make historical remarks and inspire future directions.
+1. Introduction
+The goal of building intelligent machines that are adaptive
+and self-improving over time has given rise to the continual
+learning paradigm, where the learner needs to solve multiple tasks presented sequentially (Thrun & Mitchell, 1995).
+In this setting, a key challenge known as catastrophic forgetting (McCloskey & Cohen, 1989) is that, unlike humans,
+the agent may forget how to solve past tasks (i.e., exhibit
+1Mathematical Institute for Data Science, Johns Hopkins University, Baltimore, USA 2
+Innovation in Data Engineering and
+Science (IDEAS), University of Pennsylvania, Philadelphia, USA
+3NORCE Norwegian Research Centre, Norway. Correspondence
+to: Liangzu Peng <lpenn@seas.upenn.edu>.
+Proceedings of the 40 th International Conference on Machine
+Learning, Honolulu, Hawaii, USA. PMLR 202, 2023. Copyright
+2023 by the author(s).
+larger errors on past tasks), after learning the present one.
+To address this problem, many practical methods have been
+proposed. For example, memory-based methods store data
+from past tasks and use it to solve the present task (LopezPaz & Ranzato, 2017), regularization-based methods add
+some regularization terms to the loss in order to prevent
+overfitting to the current task (Kirkpatrick et al., 2017), and
+expansion-based methods expand the network architecture
+to accommodate learning a new task (Rusu et al., 2016).
+Deep continual learning methods that embody either of these
+three ideas, or combinations thereof, have greatly improved
+the empirical performance in resisting catastrophic forgetting (Liu, 2022).1 While these methods have evolved so
+rapidly, at least two questions remain under-explored:
+(Q1) Is there any mathematical connection between continual learning and other conceptually related fields? The
+answer seems elusive even for multitask learning (i.e., joint
+training of all tasks): Chaudhry et al. (2020) and Mirzadeh
+et al. (2021), among many others, advocated that performing
+multitask learning gives the best performance for continual
+learning, while Wu et al. (2022) claimed the opposite.
+(Q2) How does the rehearsal mechanism provably affect
+generalization? Lopez-Paz & Ranzato (2017) claimed
+that rehearsal (i.e., joint training with part of previous
+data stored in memory and the data of the present task)
+would result in overfitting (and jeopardize generalization).
+Chaudhry et al. (2019) rebutted against this claim by empirical evidence, while Verwimp et al. (2021) offered empirical
+counter-evidence for what Chaudhry et al. (2019) argued.
+Indeed, the answer to (Q2) has been unclear, which is why
+Verwimp et al. (2021) posed this as a serious open problem.
+Our Contributions. In this paper, we focus on theoretically
+understanding continual learning and catastrophic forgetting
+by trying to answer Questions (Q1) and (Q2). In particular:
+• We propose a general framework for continual learning,
+called the Ideal Continual Learner (ICL), and we show that,
+under mild assumptions, ICL never forgets. This characterization of never forgetting makes it possible to address
+Questions (Q1) and (Q2) via dissecting the optimization and
+generalization properties of ICL.
+1We discuss the most relevant references in the main paper as
+we proceed, and we review related works in detail in the appendix.
+1
+arXiv:2305.00316v2 [cs.LG] 8 Jun 2023
+The Ideal Continual Learner (ICL)
+§2 Optimization Basics of Continual Learning
+§2.2 & §2.3 Definition of ICL (Definition 1) & ICL never forgets (Proposition 1)
+§2.4 & §2.5 ICL is a bilevel optimizer (Propositions 2 and 3) & ICL is a multitask learner (Proposition 4)
+§3 Examples of ICL & Understanding Deep Continual Learning
+§3.1.3 ICL is a memory-based (projection-based) method (Proposition 6 and Remark 3)
+§3.2.3 ICL is an expansion-based method & wide neural networks forget less catastrophically
+§4 Generalization Basics of Continual Learning
+§4.3 ICL and constrained learning & ICL is a regularization-based method
+§4.4 Generalization guarantees of rehearsal (Theorem 3) & remarks on memory selection methods
+Table 1: Structure and messages of the paper.
+Figure 1: The Ideal Continual Learner (ICL) and related
+subjects. The exact connections between ICL and these
+subjects are discussed throughout the paper and appendix.
+• Question (Q1) is considered throughout the paper: We
+bring to light the connection of ICL to many other fields—
+visualized in Figure 1—including set-theoretical estimation
+(§2.3), bilevel optimization (§2.4), multitask learning (§2.5),
+deep continual learning (§3), incremental SVD (§3.2), and
+constrained learning (§4.2). In particular, we dissect ICL
+in two examples, continual learning regression (§3.1) and
+continual matrix factorization (§3.2), showing that ICL
+is a memory-based optimization method for the former
+example and an expansion-based for the latter. We also
+connect ICL to regularization-based methods (§4.2). These
+shed considerable lights on many aspects of existing deep
+continual learning methods, e.g., their failure cases, the
+role of memory and network widths, and so on. With all
+these connections, we provide historical context and novel
+insights for future research avenues.
+• Question (Q2) is explored in §4, where we prove the generalization properties of ICL based on the classic statistical
+learning frameworks. Crucially, our theory quantifies how
+rehearsal influences generalization, shedding light on (Q2).
+Since the paper consists of multiple messages relevant to
+continual learning, it might be beneficial to overview them
+in Table 1, which includes direct links to the contents and
+aims at helping the reader navigate.
+2. Continual Learning Basics: Optimization
+2.1. Problem Setup
+Consider tasks 1, . . . , T, where task t can be solved by
+minimizing some problem of the form
+Gt := argmin
+w∈W
+Lt(w; Dt). (1)
+Here, Dt is the given data set for task t, and Gt is the set
+of global minimizers of the objective Lt (1). By continual
+learning, we mean solving the tasks sequentially from task
+1 to task T and finding some ground truth in the hypothesis
+space W ⊂ R
+n that minimizes all losses (1); if an algorithm can do so, then we say it never forgets. While each
+task could have a different hypothesis space, we trade this
+generality for simplifying the presentation.
+For such ground truth to exist, we need a basic assumption:
+Assumption 1 (Shared Multitask Model†
+). All tasks (1)
+share a common global minimizer, i.e., ∩
+T
+t=1Gt ̸= ∅.
+The intuition behind Assumption 1, which generalizes those
+of Evron et al. (2022) and Peng & Risteski (2022), is that if
+∩
+T
+t=1Gt = ∅ then there is no shared global minimizer and
+continual learning without forgetting is infeasible. Assumption 1 might be relaxed into the existence of approximate
+common global minimizers; we do not pursue this idea here.
+Note that verifying whether ∩
+T
+t=1Gt is empty or not is in
+general NP-hard even when every Gt is a “simple” polytope
+(Tiwary, 2008), which is the main reason that Knoblauch
+2
+The Ideal Continual Learner (ICL)
+et al. (2020) asserts continual learning without forgetting is
+in general NP-hard. However, Assumption 1 sidesteps the
+curse of the NP-hardness, and makes it possible to solve the
+continual learning problem computationally efficiently.
+2.2. The Ideal Continual Learner†
+(ICL†
+)
+The main role of this section and the paper, is this:
+Definition 1 (The Ideal Continual Learner†
+, ICL†
+). With
+K0 := W, ICL†
+is an algorithm that solves the following
+program sequentially for t = 1, 2, . . . , T:
+Kt ← argmin
+w∈Kt−1
+Lt(w; Dt). (2)
+The symbol † in Definition 1 is a reminder that ICL† has
+not been proved (until §4) to be a learner in the statistical
+learning sense. Recursion (2) asks for a lot: Computing the
+entire set K1 of global minimizers is hard enough, let alone
+constraining over it, recursively! Indeed, we use the word
+“ideal” to imply that ICL†
+is not realizable at the current
+stage of research. However, take a leap of faith, and we will
+see many pleasant consequences of ICL† under Assumption
+1, where the theoretical significance of ICL†
+is treasured.
+An immediate observation is that W = K0 ⊃ · · · ⊃ KT ,
+that is Kt shrinks (more precisely, does not grow) over time.
+An analogy can be made from two perspectives. From a human learning perspective, Kt can be viewed as a knowledge
+representation: After continually reading a 1000-page book,
+one internalizes the knowledge and represents the whole
+book with a few key notations or formulas, or with a single
+cheatsheet (but see also Remark 5, Grow = Shrink). From a
+control perspective, the analogy is that the uncertainty Kt
+over the true solutions reduces as ICL†
+learns from data
+and tasks. In fact, as we will review in Appendix E, ICL†
+is closely related to set-theoretical estimation in control
+(Combettes, 1993; Kieffer et al., 1998).
+2.3. ICL†
+is Sufficient and Minimal
+In this section, we show that the Ideal Continual Learner†
+is
+sufficient (Fisher, 1922) and minimal (Lehmann & Scheffe´,
+1950), which are two general and fundamental properties in
+the information-theoretical and statistical sense.
+Sufficiency. It has been held that “... preventing forgetting
+by design is therefore not possible [even if all losses Lt
+(1) are the same]” (van de Ven et al., 2022). Nevertheless,
+under Assumption 1, ICL† never forgets by design:
+Proposition 1 (Sufficiency). Under Assumption 1, ICL†
+solves all tasks optimally. In other words, we have Kt =
+∩
+t
+i=1Gi
+for every t = 1, . . . , T.
+Minimality. Here we show (with rigor) that the knowledge representation Kt is minimal (given the order of the
+tasks). Consider the first two tasks, which are associated
+with objective functions L1 and L2 and global minimizers
+G1 and G2 respectively. Assume that G1 and G2 intersect
+(Assumption 1), and let wˆ ∈ G1 ∩ G2. A learner solves the
+first task by minimizing L1 (1), stores some information I1,
+and proceeds to the second (the stored information I1 could
+consist of some data samples, gradients, global minimizers,
+and so on). If the stored information I1 is not enough to
+reveal that wˆ is optimal to task 1, then it is impossible for
+the learner to figure out that wˆ is actually simultaneously
+optimal to both tasks—even if it could find later that wˆ is
+optimal to task 2. Thus, either the learner would conclude
+that no common global minimizer exists and Assumption 1
+is violated, or catastrophic forgetting inevitably takes place.
+In an independent effort, Peng & Risteski (2022) made a
+similar argument specifically for two-layer neural networks.
+Our argument is more general, and is for a different purpose.
+Note that wˆ can be any element of K2 = G1 ∩ G2. Thus,
+storing a proper subset of K2 is sub-optimal since that might
+exclude global minimizers (e.g., wˆ) of subsequent tasks corresponding to t > 2 and lead to catastrophic forgetting. In
+light of this, we observe that catastrophic forgetting can only
+be prevented if we store the entire set Kt or its equivalent information (we will soon see some equivalent representations
+of Kt). In this sense, we say the knowledge representation
+Kt is minimal. It is the two properties, sufficiency and minimality, which ICL†
+(Definition 1) enjoys, that justify the
+naming: the Ideal Continual Learner†
+that never forgets.
+2.4. ICL† = Bilevel Optimizer
+Since the constraint w ∈ Kt−1 of (2) requires w to be a
+global minimizer of all previous tasks, for each task ICL†
+needs to solve a bilevel program (2), which is in general
+difficult (Vicente & Calamai, 1994; Jiang et al., 2022). However, with Assumption 1, we can describe (2) in a relatively
+simple way. The first description is immediate:
+Proposition 2. Under Assumption 1, for every t = 1, . . . , T,
+the recursion (2) of ICL†
+is equivalent to
+min
+w∈W
+Lt(w; Dt)
+s.t. Li(w; Di) ≤ ci
+, ∀i = 1, . . . , t − 1,
+(3)
+where ci
+is the minimum value of Li(w; Di) over W, computed during solving previous tasks.
+In Proposition 2, the inequality of Li(w; Di) ≤ ci can be replaced by equality =, and the constraint of (3) is understood
+as trivially fulfilled if t = 1.
+Remark 1 (Kt = Loss + Data). If we store all data and losses,
+we can recover Kt via minimizing (3), hence (obviously)
+memorizing data and losses can prevent forgetting.
+A formulation similar to (3) is known in the literature; see,
+e.g., Lopez-Paz & Ranzato (2017). However, as in many
+3
+The Ideal Continual Learner (ICL)
+continual learning papers, their formulation is dominated by
+computational considerations in the deep learning context,
+e.g., their ci
+is the loss of a sufficiently trained deep network
+for the i-th task over part of data samples; it is not necessarily a minimum value. Such approach, though practically
+important, makes it hard to derive theoretical properties.
+ICL†
+is also equivalent to the following formulation:
+Proposition 3. Assume objective functions L1, . . . , LT are
+convex and differentiable. Let W = R
+n. Under Assumption
+1, each step (2) of ICL†
+is equivalent to
+min
+w∈Rn
+Lt(w; Dt)
+s.t. ∇Li(w; Di) = 0, ∀i = 1, . . . , t − 1,
+(4)
+Remark 2 (Kt = Gradient Equations). If we store all equations ∇Li(w; Di) = 0, we can recover Kt via solving (4),
+so memorizing these equations resists forgetting.
+More generally, a common idea in bilevel programming is
+to rewrite the lower-level problem (e.g., w ∈ Kt−1) as KKT
+conditions, and many algorithms exist for the latter formulation; see, e.g., Dempe & Dutta (2012) and the follow-up
+works. While it is beyond the scope of the paper, contextualizing these ideas for implementing ICL†
+(2) is an important direction that would inspire novel and theoretically
+grounded continual learning algorithms. Note that bilevel
+programming has been used for continual learning (Borsos
+et al., 2020), but the use is mainly for selecting which data
+samples to store in the memory.
+2.5. ICL† = Multitask Learner†
+Under Assumption 1, the following connection between
+continual learning and multitask learning arises naturally:
+Proposition 4 (ICL† = Multitask Learner†
+). Let α1, . . . , αt
+be arbitrary positive numbers. Recall Kt is defined in (2) as
+the output of ICL†
+. Under Assumption 1, we have
+Kt = argmin
+w∈W
+Xt
+i=1
+αiLi(w; Di), ∀t = 1, . . . , T. (5)
+Assumption 1 implies that ICL† never forgets and provides
+the best performance for continual learning, and that minimizing the multitask loss (5) recovers ICL†
+. Hence, under
+Assumption 1, minimizing the multitask loss yields the best
+performance for continual learning. This simple result addresses issues pertaining to Question (Q1).
+3. Examples of ICL†
+This section discusses ICL†
+for two examples, continual linear regression (§3.1), continual matrix factorization (§3.2).
+By way of examples, we acquire some understanding of
+existing deep continual learning practices (§3.1.3, §3.2.3).
+3.1. Continual Linear Regression
+In §3.1.1, we review the problem setup of continual linear regression (Evron et al., 2022). In §3.1.2 we present
+the implementation of ICL†
+for continual linear regression.
+In §3.1.3 we draw connections to deep continual learning,
+shedding light on memory-based optimization methods.
+3.1.1. BACKGROUND AND PROBLEM SETUP
+In continual linear regression, the data Dt := (Xt, yt) of
+each task t consists of a feature matrix Xt ∈ R
+mt×n and
+a response vector yt ∈ R
+mt
+; here mt is the number of
+samples of task t and n their dimension, and the loss Lt is
+Lt(w; (Xt, yt)) = ∥Xtw − yt∥
+2
+2
+. (6)
+The set Gt of global minimizers for each task (6) is exactly
+an affine subspace. Under Assumption 1, the intersection
+of these affine subspaces is not empty, and finding one element in that intersection would solve all tasks optimally.
+Note that, if Xt is of full column rank, then solving task
+t yields a unique solution, which is optimal to all tasks by
+Assumption 1. To avoid this trivial case, we follow Evron
+et al. (2022) and assume Xt is rank-deficient for every t.
+Studying continual regression is of interest as (continual) regression is closely related to deep (continual) learning in the
+neural tangent kernel regime (Jacot et al., 2018). Moreover,
+as will be shown in §3.1.3, ICL†
+connects continual linear
+regression to deep continual learning even more tightly.
+With some initialization, the algorithm of Evron et al. (2022)
+proceeds in a successive (or alternating) projection fashion
+(Figure 2a). When presented with task t, it projects onto
+the affine subspace Gt = {w ∈ R
+n : X⊤
+t Xtw = X⊤
+t yt};
+this projection can be implemented via invoking a singular
+value decomposition (SVD) or leveraging the implicit bias
+of (stochastic) gradient descent. Evron et al. (2022) employed the latter approach as it is memoryless, i.e., it does
+not use any extra storage except the estimate and current
+data. However, being memoryless might entail catastrophic
+forgetting in the worst case (Evron et al., 2022, Theorem 7).
+3.1.2. IMPLEMENTING ICL†
+Our ICL† method is illustrated in Figure 2b. As per (2),
+ICL†
+sets W ← R
+n, finds the affine subspace G1 of task
+1, uses it to regularize task 2, finds their common solutions
+G1 ∩ G2, and so forth. We describe some more details next.
+Let wˆt ∈ Kt be a common global minimizer to tasks
+1, . . . , t. Let Kt be an orthonormal basis matrix2
+for the
+intersection of the nullspaces of X1, . . . , Xt. Note that
+2To simplify the presentation, we did not annotate some matrix
+sizes or subspace dimensions. It is understood that such matrices
+are of suitable sizes and subspaces of appropriate dimensions.
+4
+The Ideal Continual Learner (ICL)
+Initialization
+(a) Evron et al. (2022)
+Task 1
+Task 2
+(b) ICL†
+(Ours)
+Figure 2: For two tasks, Evron et al. (2022) follow the arrows (2a) and project the current estimate onto the affine
+subspace of solutions (blue or black), in an alternating fashion, eventually reaching a common solution (red). Instead,
+ICL†
+solves task 1, stores the affine subspace (2b, blue),
+uses it to regularize task 2 and finds all solutions (2b, red).
+w ∈ Kt if and only if w can be written as w = wˆt + Kta
+for some coefficient vector a, so for implementing ICL†
+we will compute and store (wˆt, Kt). Such computation is
+summarized in the following proposition:
+Proposition 5. ICL†
+for continual linear regression can be
+implemented as follows. Given data (X1, y1), one can compute (wˆ1, K1) via SVD. With t > 1, given (wˆt−1, Kt−1)
+and data (Xt, yt), one can compute (wˆt, Kt) via solving
+min
+w∈Kt−1
+∥Xtw − yt∥
+2
+2
+(7)
+⇔min
+a
+∥Xt(wˆt−1 + Kt−1a) − yt∥
+2
+2
+(8)
+In particular, (8) can be solved via SVD.3
+Compared to the method of Evron et al. (2022), ICL† uses
+some extra storage for Kt to attain optimality and resist
+catastrophic forgetting; note though that the storage consumption never grows as KT ⊂ · · · ⊂ K1. Finally, note that
+for continual linear regression, one can formulate ICL†
+in
+different ways than (8); see, e.g., Proposition 5.5 of (Evron
+et al., 2023) (based on Fisher information) and Proposition
+3 (based on the first-order optimality conditions).
+3.1.3. CONNECTIONS TO DEEP CONTINUAL LEARNING
+We first connect ICL†
+to the orthogonal gradient descent
+method (OGD) of Farajtabar et al. (2020):
+Proposition 6 (Informal). When applied to continual linear
+3The use of SVD is to find singular vectors corresponding to
+the extreme singular values (in particular, zero singular values)
+of a given matrix. A basic fact from numerical linear algebra is
+that, in general, the extreme singular vectors of a given matrix
+can only be found iteratively and therefore inexactly (Trefethen
+& Bau, 1997, Lecture 25). Thus, the implementations that we
+suggested for continual linear regression (§3.1.2) and continual
+matrix factorization (§3.2.2) only approximately implement ICL†
+;
+note though that such approximation quality is typically very high
+due to the existence of industry-strength SVD algorithms.
+regression, the OGD method consists of the updates
+w+ ← w − γKt−1K⊤
+t−1h, (9)
+where h is the gradient of the objective of (7), γ stepsize,
+and w (resp. w+) the previous (resp. current) iterate.
+Moreover, OGD converges to a global minimizer of (7).
+We prove Proposition 6 in Appendix C, where we also review the OGD method; see Bennani et al. (2020); Doan et al.
+(2021) for different theoretical aspects of OGD.
+Since regression can be viewed as a single-layer linear network with a least-squares loss, formula (9) can be extended
+into deep continual learning in a layer-wise manner. This
+viewpoint allows us to make the following connection:
+Remark 3. For continual linear regression, the methods of
+Zeng et al. (2019); Saha et al. (2021); Wang et al. (2021b);
+Kong et al. (2022) are of the form (9), and so they all converge “approximately” to global minimizers of (7); these
+methods differ mainly in how the projection Kt−1K⊤
+t−1
+is
+approximated and stored. For deep continual learning, their
+methods perform (9) in a layer-wise manner, with different
+projections to update the parameters of every linear layer.
+We review the methods of Remark 3 in Appendix D.1. By
+showing that these methods can be derived from the principled objective (7) of ICL†
+, we make them more interpretable. For example, Kong et al. (2022) approximate
+Kt−1K⊤
+t−1 better than Zeng et al. (2019); not surprisingly,
+Kong et al. (2022) gets better performance (see their Table
+1). Moreover, we provide an important failure case. Note
+that all these methods (including OGD) approximately solve
+(7) and the correctness of (7) relies on Assumption 1. As
+a consequence, in the absence of Assumption 1, all these
+methods (and ICL†
+) might be obsessed with the past:
+Example 1 (Past = Present). Consider the continual linear
+regression problem (6), and assume G1 and G2 are two parallel and non-intersecting affine subspaces. In this situation,
+ICL† will compute K1 = G1 and K2 = G1. In other words,
+it will get stuck to optimal points of task 1, contained in K1,
+failing to track optimal points of task 2.
+3.2. Continual Matrix Factorization
+The structure of this section parallels that of §3.1. In §3.2.1.
+We introduce the problem of continual matrix factorization;
+this problem arises as a generalization of Peng & Risteski
+(2022). In §3.2.2, we present the implementation of ICL†
+for this problem. In §3.2.3, we make connections to deep
+continual learning, highlighting expansion-based methods.
+3.2.1. BACKGROUND AND PROBLEM SETUP
+The continual matrix factorization setting is as follows. The
+data Dt := Yt of task t is a matrix Yt, and every column of
+5
+The Ideal Continual Learner (ICL)
+Yt lies in some (linear) subspace St of R
+n; we assume the
+columns of Yt span St without loss of generality. Each task
+t consists of factorizing Yt into two matrices U and C such
+that UC = Yt. This corresponds to minimizing
+Lt
+
+(U, C);Yt
+
+= ∥UC − Yt∥
+2
+F
+, (10)
+which is a matrix factorization problem. With the identity
+matrix I,
+2
+, we assume U ⊤U = I. The goal of continual
+matrix factorization is to factorize the whole data matrix
+[Y1 · · · YT ] into U and C such that [Y1 · · · YT ] = UC,
+under the constraint that Yt is presented sequentially. Under
+certain conditions, matrix factorization (10) is equivalent to
+two-layer linear neural networks, with C being the first layer
+of weight parameters and U the second (Baldi & Hornik,
+1989; Vidal, 2020; Peng & Risteski, 2022). In that sense,
+analyzing continual matrix factorization would facilitate
+understanding deep continual learning.
+Peng & Risteski (2022) performed one such analysis, based
+on prior works on orthogonal gradient descent (Farajtabar
+et al., 2020; Chaudhry et al., 2020) and matrix factorization (Ye & Du, 2021). They assumed that the rank r of
+[Y1 · · · YT ] is known, and that each Yt is a vector. With
+r given, Peng & Risteski (2022) maintain a basis matrix
+U with r columns throughout the learning process. Their
+method is not memory-efficient for two reasons: (i) Storing
+r columns is unnecessary when the learner has not encountered the r-th sample (this extra consumption of memory is
+negligible for small r, though); (ii) their algorithm furthermore requires storing two projection matrices. In §3.2.2, we
+will show that ICL†
+can handle the more general situation
+where the rank r is unknown, and it also overcomes the
+memory inefficiency of Peng & Risteski (2022).
+3.2.2. IMPLEMENTING ICL†
+To fully understand ICL†
+for continual matrix factorization,
+we first establish a basic geometric understanding of the
+problem and then discuss how to store Kt efficiently, and
+finally, we describe the implementation details.
+Basic Subspace Geometry. Minimizing (10) in variable C
+with U fixed reveals that the optimal C is exactly U ⊤Yt,
+so (10) is equivalent to ∥UU ⊤Yt − Yt∥
+2
+F
+, an objective
+function for principal component analysis (PCA). In this
+way, continual matrix factorization relates to streaming PCA
+(Mitliagkas et al., 2013; Peng & Risteski, 2022), incremental SVD (Bunch & Nielsen, 1978), and subspace tracking
+(Balzano et al., 2018). We review these subjects in Appendix
+F to highlight the connection to ICL†
+.
+Geometrically, every orthonormal basis of any subspace2
+containing St is a global minimizer of this PCA objective.
+In other words, any global minimizer of (10) is of the form
+(U, U ⊤Yt), where U is orthonormal with its range space
+range(U) containing St. Ignoring the role of U ⊤Yt for
+simplicity, we can write the set Gt of global minimizers as
+Gt := 
+U : U
+⊤U = I, St ⊂ range(U) ⊊ Rn
+	
+;
+we ruled out the case range(U) = R
+n as this indicates
+trivial solutions. Assumption 1 implies the intersection
+∩
+t
+i=1Gi = {U : U
+⊤U = I,Xt
+i=1
+Si ⊂ range(U) ⊊ Rn
+}
+is non-empty, which implies dim(PT
+t=1 St) < n or equivalent that the data matrix [Y1 · · · YT ] is rank-deficient. Note
+that this is a weaker assumption than that of Peng & Risteski
+(2022), who assumed the rank of [Y1 · · · YT ] is given.
+Storing Kt. To implement ICL† under Assumption 1, we
+need to store Kt = ∩
+t
+i=1Gi
+in a memory-efficient manner. Since we know that any orthonormal matrix whose
+range space contains Pt
+i=1 Si
+is an element of Kt (and vice
+versa), storing
+P
+Kt is equivalent to storing the subspace sum
+t
+i=1 Si
+. Indeed, storing Pt
+i Si gives enough information
+about Kt, which prevents forgetting (recall the minimality
+of Kt, §2.3). With this viewpoint, we will maintain an orthonormal basis matrix Kt of Pt
+i=1 Si
+to implement ICL†
+,
+where each subspace Si will be learned from data Yi
+.
+Implementation Details. For t = 1, we can compute the
+orthonormal basis K1 of S1 via an SVD3 on Y1; e.g., set
+K1 to be the matrix whose columns are left singular vectors
+of Y1 corresponding to its non-zero singular values.
+For t > 1, we need to compute Kt from Yt and Kt−1, under
+the inductive assumption that Kt−1 is an orthonormal basis
+matrix of Pt−1
+i=1 Si
+. Since Kt−1 consists of orthonormal
+matrices U whose range spaces contain range(Kt−1), we
+know that U ∈ Kt−1 if and only if U ⊤U = I and U is
+of the form [Kt−1 Ut] (up to some isometry). As such, the
+recursion (2) of ICL†
+is equivalent to
+argmin
+U∈Kt−1
+
+
+
+UU ⊤Yt − Yt
+
+
+
+
+2
+F
+⇔ Ut ∈ argmin
+Ut
+
+
+
+[Kt−1 Ut] [Kt−1 Ut]
+⊤Yt − Yt
+
+
+
+
+2
+F
+⇔ Ut ∈ argmin
+Ut
+
+
+
+UtU
+⊤
+t Yt − Yt
+
+
+
+
+F
+where we defined Yt := (I − Kt−1K⊤
+t−1
+)Yt and used the
+fact K⊤
+t−1Ut = 0. Similarly to the case t = 1, Ut can
+be computed via an SVD on Yt, and the rank of Yt determines the number of its columns. Setting Kt ← [Kt−1 Ut]
+furnishes a desired orthonormal basis for Pt
+i=1 Si
+.
+Remark 4 (New Knowledge = New Parameters). If St is
+contained in Pt−1
+i=1 Si
+, then there is no new “knowledge” to
+learn and Yt = 0; in this case we set Kt ← Kt−1. The
+amount of new knowledge is encoded as the rank of Yt,
+which determines the number of new parameters to add.
+
+The Ideal Continual Learner (ICL)
+3.2.3. CONNECTIONS TO DEEP CONTINUAL LEARNING
+In §3.2.2, ICL†
+is shown to be an expansion-based method
+that grows the columns of the orthonormal basis Kt adaptively. Recall that the challenges of designing expansionbased methods include (1) how many parameters to add
+and (2) where to add them. For the problem of continual
+matrix factorization, ICL†
+addresses these two challenges
+perfectly by leveraging the eigen structures of features Yt
+or projected features Yt. To our knowledge, no expansionbased methods in deep continual learning have exploited
+such structures; this implies an important extension as future
+work. Also, different from many existing expansion-based
+methods (as Yan et al. (2021) reviewed), ICL† does not
+require the identity of the task at the test time.
+The other important aspect that ICL†
+reveals is the role
+of the network width in resisting catastrophic forgetting.
+Indeed, the matrix Kt can be viewed as the second layer of a
+two-layer linear network, and the growth of its columns corresponds to increasing the network width. This principled
+way of increasing the network width complements the empirical claim of Mirzadeh et al. (2022) and the experimental
+observation of Rusu et al. (2016); Yoon et al. (2018): Wide
+neural networks forget less catastrophically. Two remarks
+are in order, to finish the section:
+Remark 5 (Grow = Shrink). While Kt shrinks in continual linear regression and we have Kt ⊂ Kt−1 in general,
+we see that, in continual matrix factorization, Kt grows its
+columns as ICL†
+is presented with more subspaces. However, the sum Pt
+i=1 Si can be uniquely identified with the
+intersection ∩
+t
+i=1S
+⊥
+i
+of the orthogonal complement S
+⊥
+i
+, and
+therefore if we store a basis matrix for ∩
+t
+i=1S
+⊥
+i
+(instead of
+for Pt
+i=1 Si), then the memory consumption shrinks over
+time. We will elaborate on this idea in Appendix G.
+Remark 6 (Remember = Forget). While Kt−1 remembers
+all common global minimizers, ICL†
+actually forgets Kt−1
+as it never updates Kt−1. Put differently, the ability of a
+learner to improve the performance on previous tasks with
+knowledge from new tasks is desired (only) when previous tasks are solved sub-optimally; such ability is typically
+called positive backward transfer (Lin et al., 2022b).
+4. Continual Learning Basics: Generalization
+In this section we prove that ICL†
+is a learner in the statistical learning sense (therefore we can remove †); see, e.g.,
+Shalev-Shwartz & Ben-David (2014); Mohri et al. (2018)
+for some basics of statistical learning. Towards that goal, we
+now reframe our problem setup in a statistical learning environment. Assume that, for task t, the dataset Dt = {dti}
+mt
+i=1
+consists of mt independent and identically distributed samples dti
+i.i.d. ∼ Dt, where Dt is some (unknown) data distribution for task t, and the objective Lt (2) is given as
+Lt(w; Dt) := 1
+mt
+Xmt
+i=1
+ℓt(w; dti), (11)
+where ℓt(w; dti) is the loss on sample dti evaluated at w.
+Hence, (2) becomes an empirical risk minimization problem,
+and ICL† becomes a (constrained) empirical risk minimizer.
+Corresponding to (11) is the statistical learning task
+G
+∗
+t
+:= argmin
+w∈W
+Ed∼Dt
+[ℓt(w; d)]. (12)
+To proceed, we need the assumption of shared multitask
+model and the Ideal Continual Learner (without †):
+Assumption 2 (Shared Multitask Model). ∩
+T
+t=1G
+∗
+t ̸= ∅.
+Definition 2 (The Ideal Continual Learner, ICL). With
+K∗
+0
+:= W, for t = 1, 2, . . . , T, the algorithm ICL solves
+K
+∗
+t ← argmin
+w∈K∗
+t−1
+Ed∼Dt
+[ℓt(w; d)]. (13)
+Much of what we said to ICL†
+and Assumption 1 applies
+to the Ideal Continual Learner (ICL) and Assumption 2;
+we shall not repeat here. Instead, we will investigate the
+possibility of minimizing (12) or (13) via ICL†
+.
+One difficulty of such investigation is as follows. While
+Gt of (1) approaches G
+∗
+t of (12) as sample size mt tends to
+infinity, in general we have Gt ̸= G
+∗
+t when mt is finite. As
+such, Assumptions 1 and 2 are different (though related),
+and, in general, one of them does not imply the other. As
+a consequence, the sufficiency of ICL under Assumption
+2 does not imply the sufficiency of ICL†
+, which requires
+Assumption 1 (cf. Proposition 1); and vice versa. This
+difficulty disappears if we make both Assumptions 1 and 2,
+which, however, would ask for too much.
+We will proceed with either Assumption 1 (§4.1) or Assumption 2 (§4.2), but not both. To do so, we need some
+assumptions on the objective functions Lt and hypothesis
+space W, which are standard in statistical learning:
+Assumption 3 (Uniform Convergence). Let B and M be
+two positive constants. Assume ∥w∥2 ≤ B for every w ∈
+W. Assume that ℓt(w; d) is M-Lipschitz in w for every
+sample d ∼ Dt and every t = 1, . . . , T, i.e.,
+|ℓt(w; d) − ℓt(w′
+; d)| ≤ M · ∥w − w′
+∥2, ∀w, w′ ∈ W.
+These assumptions suffice to ensure uniform convergence
+(Shalev-Shwartz et al., 2009, Thm 5): For fixed t and δ ∈
+(0, 1), with probability at least 1 − δ we have (∀w ∈ W)
+|Lt(w; Dt) − Ed∼Dt
+[ℓt(w; d)]| ≤ ζ(mt, δ), (14)
+where ζ(mt, δ) := O
+MBp
+n log(mt) log(n/δ)
+√mt
+
+approaches zero as the sample size mt tends to infinity.
+7
+The Ideal Continual Learner (ICL)
+The term ζ(mt, δ) defined in (14) serves as a uniform convergence bound and will appear frequently in our generalization bounds. While ζ(mt, δ) approaches zero as the sample
+size mt tends to infinity (assuming other terms are fixed),
+it is also controlled by other factors as (14) suggests. First
+of all, it depends on the failure probability δ, and we would
+like to set δ small. Second, it depends on the Lipschitz
+continuity constant M of the loss function; in the context
+of deep learning, M is controlled by network architectures
+and its value is typically unknown, although it might be
+estimated in certain cases via computationally intensive
+algorithms (Fazlyab et al., 2019). Third, ζ(mt, δ) also depends on the dimension n of the variable w (e.g., the number
+of parameters in a deep network). In particular, we have
+ζ(mt, δ) = O(
+p
+n log n/mt) (ignoring other parameters),
+and so, for ζ(mt, δ) to be small, we need mt ≫ n log n.
+4.1. ICL† Learns All Tasks
+In this section, we proceed with Assumption 1 and without
+Assumption 2. Our main result is this (see also Figure 3):
+Theorem 1 (ICL† ⇒ All-Task Learner). Let c
+∗
+t be the
+minimum value of (12). Let wˆ ∈ KT . Let δ ∈ (0, 1) and
+ζ(mt, δ) be as in Assumption 3. Under Assumptions 1 and
+3, with probability at least 1 − δ, we have (∀t = 1, . . . , T)
+c
+∗
+t ≤ Ed∼Dt
+[ℓt(wˆ; d)] ≤ c
+∗
+t + ζ(mt, δ/T). (15)
+As (14) implies, an exponentially large T would make the
+numerator of the error term ζ(mt, δ/T) in (15) large, while
+a large number of samples mt would make it small. In the
+extreme case T → ∞, it is necessary to have mt → ∞, otherwise ζ(mt, δ/T) would be infinity and the upper bound of
+(15) would be invalid. In the current deep continual learning
+practice, though, T is of the constant order, e.g., T ≤ 1000
+(Lesort et al., 2022). Note then that, for fixed T and δ, as
+the sample size mt tends to ∞ for every t = 1, . . . , T, we
+have ζ(mt, δ/T) → 0, in which case ICL† becomes an
+all-task learner: Every point wˆT of KT that it finds reaches
+the minimum values of all learning tasks (12).
+Remark 7 (Approximate Sufficiency). Assumptions 1 and 3
+promise wˆ (15) to be an approximate global minimizer to
+all learning tasks (12); or we might say that they make ICL
+approximately sufficient even without Assumption 2.
+4.2. Relaxed Continual Learner† = ICL
+Here, we consider Assumption 2, at the risk that ICL†
+might not be sufficient. However, by deriving generalization
+bounds, we will prove that a relaxation of ICL†
+is ICL.
+While ICL†
+can perform arbitrarily worse for certain pathological cases in the absence of Assumption 1 (as Example
+1 showed), Assumptions 2 and 3 come into play, making
+ICL† approximately sufficient (similarly to Remark 7):
+Proposition 7 (Approximate Sufficiency). Let δ ∈ (0, 1).
+Assumptions 2, 3 imply there is a point w ∈ W satisfying
+Lt(w; Dt) ≤ ct + ζ(mt, δ/T), ∀t = 1, . . . , T
+with probability at least 1 − δ. Here ct and ζ(mt, δ) are
+respectively defined in Proposition 2 and Assumption 3.
+In the absence of Assumption 1, the constraint of ICL†
+in
+Proposition 2 might be prohibitive and lead to sub-optimal
+solutions (cf. Example 1). This is why we relax it as per
+Proposition 7 by some additive factor:
+Definition 3 (Relaxed Continual Learner†
+). With K0 := W,
+the relaxed Continual Learner†
+is an algorithm that solves
+the following program sequentially for t = 1, 2, . . . , T:
+min
+w∈W
+Lt(w; Dt) (16)
+s.t. Li(w; Di) ≤ ci + ζ(mi
+, δ/t), ∀i = 1, . . . , t − 1
+We can now state the following (see also Figure 3):
+Theorem 2 (Relaxed Continual Learner† ≈ ICL). Let δ ∈
+(0, 1). Let c
+∗
+t be the minimum of (12) and ζ(mt, δ) defined
+in (14). Suppose Assumptions 2 and 3 hold. With probability
+at least 1 − δ, the relaxed Continual Learner†
+is feasible,
+and its global minimizer w satisfies (∀t = 1, . . . , T)
+c
+∗
+t ≤ Ed∼Dt
+[ℓt(w; d)] ≤ c
+∗
+t + ζ(mt, δ/T). (17)
+4.3. ICL and Constrained Learning
+Similarly to Proposition 2, the constraint w ∈ K∗
+t−1 of ICL
+can be written as inequality constraints Ed∼Di
+[ℓi(w; d)] ≤
+c
+∗
+i
+(∀i = 1, . . . , t − 1), where c
+∗
+i
+is the minimum for task
+i (12). If the values of c
+∗
+i
+are instead determined by applications (not as minima of prior tasks), then the resulting
+learning problem coincides with constrained learning (Chamon et al., 2022). Constrained learning naturally arises
+when learning under certain requirements, e.g., robustness
+(Zhang et al., 2019; Robey et al., 2021), safety (Paternain
+et al., 2019), or fairness (Cotter et al., 2019). In a different line of research, constrained learning is also called
+stochastic optimization with expectation constraints (Yu
+et al., 2017; Bedi et al., 2019; Madavan & Bose, 2021;
+Akhtar et al., 2021). For both problems, several algorithms
+have recently emerged with theoretical guarantees. For example, Chamon et al. (2022) solve the constrained learning
+problem using Lagrangian multipliers, which can be viewed
+as a regularization-based method as per a common deep
+continual learning taxonomy. Left though to future work,
+leveraging this line of research might be key to improving
+the current continual learning systems. Finally, note that
+Chamon et al. (2022) developed generalization bounds for
+constrained learning via different mathematical mechanisms
+(e.g., primal-dual analysis), and we refer the reader to their
+works for a detailed exposition of these ideas.
+8
+The Ideal Continual Learner (ICL)
+Assumption 1
+The Ideal Continual Learner†
+Assumption 3
+Assumption 2
+The Ideal Continual Learner
+Figure 3: Figure 3 is designed to help the reader understand our results of §4.1 and §4.2 at a high level, and it can be read as
+follows. Assumptions 1 and 2 guarantee the sufficiency of the Ideal Continual Learner†
+and the Ideal Continual Learner,
+respectively, and this is denoted by solid arrows in the figure. Assumptions 1 and 3 indicate an approximate sufficiency of
+the Ideal Continual Learner†
+(cf. Theorem 1 and Remark 7), and this is denoted by a dashed arrow in the figure.
+4.4. ICL and Rehearsal
+Using the ICL framework, we can now acquire a theoretical
+understanding of research and debate (Q2). For each task
+t = 1, . . . , T − 1, assume we stored st samples (out of mt),
+and we now face task T. We rehearse, i.e., retrain with all
+stored samples and data of task T, to minimize
+min
+w∈W
+1
+mT
+XmT
+i=1
+ℓT (w; dT i) +
+T
+X−1
+t=1
+1
+st
+Xst
+i=1
+ℓt(w; dti). (18)
+Rehearsal has shown good empirical performance in deep
+continual learning; see, e.g., Chaudhry et al. (2019); Prabhu
+et al. (2020); Zhang et al. (2022); Bonicelli et al. (2022). For
+the first time to our knowledge, a theoretical justification
+that accounts for its effectiveness is provided here:
+Theorem 3 (Rehearsal ≈ ICL). Under Assumptions 2 and
+3, with probability at least 1 − δ, every global minimizer w
+of the rehearsal objective (18) satisfies
+X
+T
+t=1
+c
+∗
+t ≤
+X
+T
+t=1
+Ed∼Dt
+[ℓt(w; d)] ≤
+X
+T
+t=1
+c
+∗
+t + ERROR
+where ERROR := ζ(mT , δ/T) +
+T
+X−1
+t=1
+ζ(st, δ/T).
+(19)
+Note how (19) reveals the way rehearsal affects generalization: A larger memory buffer (st) means a smaller
+ζ(st, δ/T), implying better generalization. Crucially, this
+bound remains the same as long as we store the same number of samples for each task (say st) regardless of which
+samples we store (a natural consequence of the i.i.d. assumption). This deviates from the trendy idea of selecting
+representative samples in recent methods—reportedly, these
+methods do not necessarily outperform a simple random
+selection mechanism (Araujo et al., 2022). Due to space,
+more elaborations are put in Appendix B.2.
+We can then compare the relaxed Continual Learner†
+(§4.2)
+and rehearsal (§4.4). Note first that one could also implement the relaxed Continual Learner† using a subset of
+samples similar to rehearsal. Theoretically, the relaxed Continual Learner†
+enjoys stronger generalization guarantees
+than rehearsal: Theorem 2 bounds generalization errors for
+individual tasks, while Theorem 3 only gives a bound on
+the multitask error. Computationally, rehearsal is simpler
+to implement than the relaxed Continual Learner†
+and can
+maintain good performance (Chaudhry et al., 2019; Prabhu
+et al., 2020; Zhang et al., 2022; Bonicelli et al., 2022).
+5. Conclusion
+Under the ICL framework, we derived and justified many
+existing methods in deep continual learning. Put conversely,
+all roads lead to Rome: Many prior continual learning methods developed with different insights and different motivations turn out to be (approximately) ICL. Importantly,
+we made several connections to other research fields. This
+activates opportunities for improving the existing (deep)
+continual learning systems, for which we venture to hope
+that ICL serves as a primary design principle.
+The ICL framework in its present form comes with limitations. On the theoretical side, we tacitly assumed that the
+samples of each task t are drawn i.i.d. from distribution Dt
+in our generalization theory. While this i.i.d. assumption is
+standard in classic statistical learning, dispensing with it and
+accounting for out-of-distribution data within tasks is left as
+future work. On the algorithmic front, we emphasize that,
+in general, and particularly for deep continual learning, it
+is by no means easy to develop an exact implementation of
+ICL, which constitutes a major limitation of the proposed
+framework. Nevertheless, our paper has suggested many
+possibilities for approximating the Ideal Continual Learner.
+We believe devising such approximations with problemspecific insights will be a promising research direction.
+Acknowledgements. This work is supported by the project
+ULEARN “Unsupervised Lifelong Learning” and co-funded
+under the grant number 316080 of the Research Council of
+Norway.
+
+
+A. Structure of The Appendix
+We structure the appendix as follows:
+• In Appendix B, we elaborate on several points for the reader to better understand and appreciate the main paper.
+• In Appendix C, we prove Proposition 6, showing that OGD is approximately the Ideal Continual Learner†
+in the case
+of continual linear regression.
+• In Appendix D, we review related works on continual learning, emphasizing deep continual learning methods that we
+mentioned in Remark 3, existing assumptions on task relationships, and existing theoretical papers.
+• We review related works in other related fields that are visualized in Figure 1. The emphasis is put on their connections
+to the Ideal Continual Learner and on detailed comparisons of our approach to related works.
+– In Appendix E, we review related works in set-theoretical estimation. This allows us to understand the Ideal
+Continual Learner from different perspectives.
+– In Appendix F, we review streaming PCA, incremental SVD, and subspace tracking. An important remark there
+is that expansion-based methods can be traced back to Bunch & Nielsen (1978) who proposed a method for
+incremental SVD.
+• In Appendix G, as promised in Remark 5, we present a dual approach to continual matrix factorization, where the
+storage consumption shrinks over time.
+B. Elaboration on The Main Paper
+Here we take the opportunity to elaborate on several points omitted in the main paper due to the lack of space.
+B.1. Elaboration on Terminologies
+• At first glance the Ideal Continual Learner seems to implicitly assume that the task identities are given during training,
+and therefore it can not be applied to the more general and more challenging case of task-agnostic or task-free continual
+learning, where in the training phase the learner has no access to task identities (Zeno et al., 2018; 2021; Aljundi et al.,
+2019a; Lee et al., 2020; Jin et al., 2021; Wang et al., 2022c; Pourcel et al., 2022; Ye & Bors, 2022). However, for
+task-agnostic or task-free continual learning, we receive a batch of samples each time, and we can simply regard it
+as a task, and compute the set of common global minimizers for this batch of data. Then we can formulate (2) for
+the next task (i.e., the next batch). Summarized informally, ICL is task-agnostic. However, a major limitation of this
+task-agnostic formulation of ICL is that it leads to a very large T, which compromises the generalization bounds
+derived in the main paper.
+• Methods of Remark 3 project the gradients onto certain subspaces, so they can be thought of as regularizing the
+gradients. This is why these methods are called regularization-based methods in the taxonomy of Qu et al. (2021).
+In the paper, we call them memory-based optimization methods, as they need to store some projection matrices and
+we believe it is important to highlight this extra memory consumption for continual learning. We used the phrase
+expansion-based methods, while architecture-based methods and structure-based methods are popular alternatives.
+• While our formulation of the continual learning problem is general (e.g., each task can have different losses), our
+examples of continual linear regression and continual matrix factorization (§3) are specific in the sense that each
+task has the same loss and it is just that data samples are different for every task. This specific setting is called
+domain-incremental learning in the taxonomy of van de Ven et al. (2022). Quote van de Ven et al. (2022):
+Using task-specific components in this scenario is, however, only possible if an algorithm first identifies the task, but
+that is not necessarily the most efficient strategy. Preventing forgetting ‘by design’ is therefore not possible with
+domain-incremental learning, and alleviating catastrophic forgetting is still an important unsolved challenge.
+That said, we proved that continual learning without forgetting is possible under Assumption 1.
+16
+The Ideal Continual Learner (ICL)
+B.2. Elaboration on Memory Selection Methods
+Here we review related works on memory selection methods for rehearsal in light of Theorem 3.
+Arguably, rehearsal is a very simple and effective idea that balances memory consumption and the amount of forgetting.
+It has been commonly believed that, quoting Chaudhry et al. (2019), “... the sample that the learner selects to populate
+the memory becomes crucial”. Based on prior works (Vitter, 1985; Lopez-Paz & Ranzato, 2017; Rebuffi et al., 2017;
+Riemer et al., 2019), Chaudhry et al. (2019) summarized four (seven resp.) basic methods for selecting samples. More
+recently, based on Isele & Cosgun (2018); Hayes & Kanan (2021), Araujo et al. (2022) further included three more basic
+methods, and compared the seven methods for natural language processing applications. The setting of Araujo et al. (2022)
+is domain-incremental learning, and our generalization bound (19) applies to the rehearsal mechanism verbatim, under the
+same assumptions. (Our result for the constrained optimization formulation is not applicable as it requires task identities.)
+Table 1 of Araujo et al. (2022) presents the performance of these seven methods for text classification and question answering,
+while Table 2 presents running times. From the two tables, one can observe the performance difference between N. Random
+and Reservoir is statistically insignificant. Figure 1 of Araujo et al. (2022) further shows that the two sampling methods, N.
+Random and Reservoir, tend to keep nearly the same number of samples for each task, while the samples that N. Random
+selects and those that Reservoir selects are in general very different. This corresponds well to Theorem 3, which formalizes
+an intuitive fact that selecting which samples to store does not matter under if the samples within each task fulfill the i.i.d.
+assumption. In particular, our generalization bound (19) is sensitive mainly to the number of samples for every task.
+It is thus important to ruminate on whether selecting the so-called representative or diverse samples is relevant for improving
+continual learning systems (Araujo et al., 2022). We believe that selecting representative samples from each task or in a
+streaming setting can still be beneficial (Borsos et al., 2020; Sun et al., 2022) if the datasets contain some out-of-distribution
+data. This prompts incorporating an out-of-distribution detection module into continual learning frameworks.
+C. Orthogonal Gradient Descent and Proposition 6
+C.1. Orthogonal Gradient Descent for Deep Continual Learning
+We first review the orthogonal gradient descent algorithm (OGD) of Farajtabar et al. (2020) for deep continual learning in
+image classification. In this image classification application, the dataset Dt for task t is {xti, yti}
+mt
+i=1, where xti is some
+input image and yti is an one-hot vector of class labels. The training objective for task t in this context is typically written as
+min
+w∈Rn
+Xmt
+i=1
+ℓCE(f(w; xti); yti),
+where ℓCE(·, ·) is the softmax cross entropy loss, and f represents a deep network parameterized by w ∈ R
+n. The key
+idea of OGD is that, after training on task 1 via gradient descent and obtaining a good (if not optimal) estimate we1, the
+training on task 2 is still via gradient descent, but the gradient is replaced by its projection onto the orthogonal complement
+of the range space of ∇f1 := [∇f(we1; x11), . . . , ∇f(we1; x1m1
+)]. Here, the gradient ∇ is evaluated with respect to the first
+parameter of f (e.g., network weights). This idea is easily extended to multiple tasks. In particular, suppose we are now
+going to solve task t. For i = 1, . . . , t − 1, let wei be the network weights obtained via training for tasks 1, . . . , i sequentially.
+For training on task t, The OGD method performs gradient descent, with the gradient replaced by its projection onto the
+orthogonal complement of the range space of
+∇Ft−1 := [∇f1, . . . , ∇ft−1], ∇fi
+:= [∇f(wei
+; xi1), . . . , ∇f(wei
+; ximi
+)] (∀i = 1, . . . , t − 1).
+In deep learning, the numbers of parameters and data samples are very large, so storing ∇Ft−1 is prohibitive. This is
+improved by several recent follow-up works, which we mentioned in Remark 3 and will review in Appendix D.1. Note
+that we will derive a theoretical analysis of OGD for continual linear regression (Appendix C.3), and our analysis is also
+applicable to methods of Remark 3 under similar assumptions.
+C.2. Orthogonal Gradient Descent for Continual Linear Regression
+We now derive the OGD algorithm for continual linear regression. For each task t, the model is f(w; Xt) := Xtw and the
+loss is the MSE loss. So we have ∇fi = X⊤
+i
+for every i = 1, . . . , t − 1 (i.e., the gradient is constant). Therefore,
+∇Ft−1 := [∇f1, . . . , ∇ft−1] = [X⊤
+1
+, . . . , X⊤
+t−1
+].
+17
+The Ideal Continual Learner (ICL)
+Denote by range(·) and null(·) the range space and nullspace of some matrix, respectively. By basic linear algebra we have
+
+range(∇Ft−1)
+⊥
+=
+
+range
+[X⊤
+1
+, . . . , X⊤
+t−1
+]
+
+⊥
+= null
+[X⊤
+1
+, . . . , X⊤
+t−1
+]
+⊤
+
+= null(X1) ∩ · · · ∩ null(Xt−1)
+= range(Kt−1).
+(20)
+Here we recall that we defined Kt−1 as an orthonormal basis matrix of null(X1) ∩ · · · ∩ null(Xt−1) in §3.1. Since
+K⊤
+t−1Kt−1 is the identity matrix, the matrix representation of this projection is Kt−1K⊤
+t−1
+. When solving task t, OGD
+projects the gradient of the loss ∥Xtw − yt∥
+2
+2
+at each iteration onto range(Kt−1), and then performs a descent step with
+this modified gradient. We next describe the OGD algorithm more formally.
+Let k be an iteration counter, γ
+(k)
+t
+the stepsize for task t at iteration k. Set the initialization w
+(0)
+t
+for task t as the final
+weight wet−1 after training the previous tasks sequentially, i.e., w
+(0)
+t ← wet−1, while for the first task we use an arbitrary
+initialization w
+(0)
+1
+. For task 1, OGD performs gradient descent
+w
+(k+1)
+1 ← w
+(k)
+1 − γ
+(k)
+1 h
+(k)
+t
+, h
+(k)
+1
+:= 2X⊤
+1
+(X1w
+(k)
+1 − y1).
+For task t > 1, its update rule is defined as (recall (9))
+w
+(k+1)
+t ← w
+(k)
+t − γ
+(k)
+t
+· Kt−1K⊤
+t−1h
+(k)
+t
+, h
+(k)
+t
+:= 2X⊤
+t
+(Xtw
+(k)
+t − yt). (21)
+C.3. Theoretical Analysis of Orthogonal Gradient Descent for Continual Linear Regression
+In this section we interpret what we meant by Proposition 6. Let us start with a simplified situation where OGD is assumed
+to already find a common global minimizer of the first t − 1 tasks.
+Proposition 8. Let t > 1. Suppose Assumption 1 holds for continual linear regression. Assume that the weight wet−1
+produced by OGD after training the first t − 1 tasks is a common global minimizer of tasks 1, . . . , t − 1. Then the update
+formula (21) of OGD for task t is equivalent to a gradient descent step applied to the objective (8) of ICL†
+.
+Proof. Since OGD is initialized at a common global minimizer w
+(0)
+t = wet−1, we can write w
+(0)
+t = wet−1 + Kt−1a
+(0)
+t
+for
+a unique a
+(0)
+t
+(actually a
+(0)
+t = 0). Define Xt := XtKt−1 and
+a
+(1)
+t
+:= a
+(0)
+t − γ
+(0)
+1 g
+(0)
+1
+, g
+(0)
+1
+:= 2X
+⊤
+t
+(Xta
+(0)
+t + Xtwet−1 − yt). (22)
+Note that (22) is exactly a gradient descent step applied to (8) (with wˆt−1 replaced by a “different” particular solution wet−1
+of first t − 1 tasks). As per (21), the first iteration of OGD is
+w
+(1)
+t ← w
+(0)
+t − γ
+(0)
+t
+· Kt−1K⊤
+t−1
+
+2X⊤
+t
+(Xtw
+(0)
+t − yt)
+
+⇔ w
+(1)
+t = wet−1 + Kt−1a
+(0)
+t − γ
+(0)
+t
+· Kt−1
+
+2X
+⊤
+t
+
+Xt(wet−1 + Kt−1a
+(0)
+t
+) − yt
+
+
+⇔ w
+(1)
+t = wet−1 + Kt−1(a
+(0)
+t − γ
+(0)
+t g
+(0)
+1
+)
+⇔ w
+(1)
+t = wet−1 + Kt−1a
+(1)
+t
+(23)
+Now we see from (22) and (23) that the first iteration of OGD can be thought of first computing the coefficient vector a
+(1)
+t
+via gradient descent (22) and then updating w
+(1)
+t via w
+(1)
+t = wet−1 +Kt−1a
+(1)
+t
+. Since wet−1 and Kt−1 are fixed, the update
+of w
+(1)
+t
+in the first iteration of OGD can actually be viewed as calculating a
+(1)
+t
+implicitly. Finally, one can easily verify that
+the above derivation applies to any iteration k (e.g., by changing the indices from 0 to k and from 1 to k + 1).
+With a suitable choice of stepsizes, gradient descent converges to an optimal solution to (8) at the number of iterations k
+approaches infinity; see, e.g., Theorem 2.1.14 of Nesterov (2018). As a consequence, under the assumption of Proposition 8,
+the OGD algorithm applied to continual linear regression converges to an optimal solution of (7) as k → ∞.
+The above analysis relies on simplified assumptions that OGD can find an exact solution to the first t − 1 tasks, and that one
+can run OGD for infinitely many iterations. Dispensing with these assumptions to reach a similar conclusion is not hard
+The Ideal Continual Learner (ICL)
+Proposition 9. Assume t > 1. Suppose Assumption 1 holds for continual linear regression. Let wet−1 be the weight
+produced by the OGD algorithm after training the first t − 1 tasks. Then the update formula (21) of the OGD algorithm for
+task t is equivalent to a gradient descent step applied to the following problem
+min
+a
+∥Xt(wet−1 + Kt−1a) − yt∥
+2
+2
+. (24)
+Proof. The proof follows directly from that of Proposition 8.
+The only difference of (24) from the objective (8) of ICL†
+is that wet−1 now might not be optimal for all previous tasks.
+Therefore, OGD is approximately equivalent to ICL†
+, and its approximation quality depends on how close wet−1 is to the
+set Kt−1 of common solutions to previous t − 1 tasks.
+D. Continual Learning: Related Works
+There are now many existing methods for (deep) continual learning, including regularization-based methods (Kirkpatrick
+et al., 2017; Zenke et al., 2017; Liu et al., 2018; Ritter et al., 2018; Lesort et al., 2019; Park et al., 2019; Yin et al., 2020;
+Zhou et al., 2021; Heckel, 2022), memory-based methods (Robins, 1993; Shin et al., 2017; Rebuffi et al., 2017; Lopez-Paz
+& Ranzato, 2017; Chaudhry et al., 2019; Aljundi et al., 2019b; Buzzega et al., 2020; Verwimp et al., 2021; Bang et al., 2021;
+Kim et al., 2022; Zhang et al., 2022; Wang et al., 2022a; Saha & Roy, 2023), expansion-based methods (Rusu et al., 2016;
+Yoon et al., 2018; Mallya & Lazebnik, 2018; Li et al., 2019; Hung et al., 2019; Ramesh & Chaudhari, 2022; Douillard et al.,
+2022), or combinations thereof (Yan et al., 2021; Xie et al., 2022; Wang et al., 2022b; Frascaroli et al., 2023); for surveys,
+see, e.g., Parisi et al. (2019); De Lange et al. (2022); Qu et al. (2021); Shaheen et al. (2022); van de Ven et al. (2022).
+Our review here has two purposes. First, we will discuss the methods of Remark 3 in detail as they are highly related to
+ICL†
+. Second, we will discuss related theoretical works through the lens of task relationships.
+D.1. Memory-Based Optimization Methods (Projection-Based Methods)
+The Basic Idea. Suppose now we have a three-layer deep network f in the following form:
+f
+
+(W1,W2,W3); X
+(0)
+t
+
+:= σ3(σ2(σ1(X
+(0)
+t W1)W2)W3) (25)
+Here, each σi
+is some non-linearity activation function, Wi matrices of learnable weights, and X
+(0)
+t
+an input data matrix at
+the t-th batch (or for the t-th task). Every column of X
+(0)
+t
+is a data sample, and the number of columns corresponds to the
+batch size. We consider three layers as an example; what follows applies to multiple layers and is without loss of generality.
+Let us write the network f (25) equivalently as
+f
+
+(W1,W2,W3); X
+(0)
+t
+
+= σ3(X
+(2)
+t W3), X
+(2)
+t
+:= σ2(X
+(1)
+t W2), X
+(1)
+t
+:= σ1(X
+(0)
+t W1). (26)
+To proceed, suppose for every j = 0, 1, 2 the intersection ∩
+t−1
+i=1null(X
+(j)
+i
+) of nullspaces is not empty, and denote by K
+(j)
+t−1
+an orthonormal basis matrix of ∩
+t−1
+i=1null(X
+(j)
+i
+). This matrix K
+(j)
+t−1
+plays the same role as the matrix Kt−1 that we defined
+for continual linear regression (§3.1), and the difference is that we now defined such matrices for every linear layer.
+Suppose now we have the data X
+(0)
+t
+for task (batch) t available. Let G1, G2 and G3 be the gradients calculated via data
+X
+(0)
+t
+and they account respectively for weights W1,W2, and W3. Let γ1, γ2, γ3 be stepsizes. Then the weight update
+W+
+1 ← W1 − γ1K
+(1)
+t−1
+(K
+(1)
+t−1
+)
+⊤G1
+W+
+2 ← W2 − γ2K
+(2)
+t−1
+(K
+(2)
+t−1
+)
+⊤G2
+W+
+3 ← W3 − γ2K
+(3)
+t−1
+(K
+(3)
+t−1
+)
+⊤G3
+(27)
+never changes the output of f on previous batches; for every i < t, it holds that
+X
+(0)
+i W+
+1 = X
+(0)
+i W1, X
+(1)
+i W+
+2 = X
+(1)
+i W2, X
+(2)
+i W+
+3 = X
+(2)
+i W3
+⇒ f
+
+(W+
+1
+,W+
+2
+,W+
+3
+); X
+(0)
+i
+
+= f
+
+(W1,W2,W3); X
+(0)
+i
+
+.
+The Ideal Continual Learner (ICL)
+Yet, (27) can decrease the loss of the current data X
+(0)
+t
+. This makes storing K
+(j)
+t−1
+an appealing approach for preventing forgetting. In reality, each X
+(j)
+i might not have a nullspace (for a small enough batch size), and the intersection ∩
+t−1
+i=1null(X
+(j)
+i
+)
+might simply be empty. A simple and effective rescue is to perform certain low-rank approximations; we will not go into the
+details here, and we omit some practically important implementation details.
+The Literature. The literature of continual learning has followed a slightly longer and perhaps more vivid trajectory to
+eventually identify the role of the projection matrix K
+(j)
+t−1
+(K
+(j)
+t−1
+)
+⊤ in resisting forgetting. We review this trajectory next.
+Inspired by classic works on adaptive filtering (Haykin, 2002) and recursive least-squares (Singhal & Wu, 1989) in signal
+processing, Zeng et al. (2019) proposed to set the projection matrix to be I − (X
+(j)
+1
+)
+⊤
+
+X
+(j)
+1
+(X
+(j)
+1
+)
+⊤ + λI−1X
+(j)
+1
+for
+the task 1 and update it for later tasks as in recursive least-squares. Here λ > 0 is some hyper-parameter and I identity
+matrix, and they are used to prevent the case where X
+(j)
+1
+(X
+(j)
+1
+)
+⊤ is not invertible. The method of Zeng et al. (2019) can be
+understood as recursive least-squares applied to deep networks in a layer-wise manner.
+If the batch size is large enough, then X
+(j)
+1
+(X
+(j)
+1
+)
+⊤ is in general invertible, and if λ = 0 then I −
+(X
+(j)
+1
+)
+⊤
+
+X
+(j)
+1
+(X
+(j)
+1
+)
+⊤
+−1X
+(j)
+1
+is exactly a projection onto the nullspace of X
+(j)
+1
+. While Guo et al. (2022) showed
+that updating λ in a certain way at every batch improves the empirical performance, inverting X
+(j)
+1
+(X
+(j)
+1
+)
+⊤ + λI might not
+be necessary if the goal is to compute (approximate) the nullspace of X
+(j)
+1
+, which can be done via SVD. In fact, doing SVD
+would also eliminate the hyper-parameter λ.
+Improvements over the strategy of Zeng et al. (2019) are given by independent efforts from Wang et al. (2021b) and Saha et al.
+(2021). Wang et al. (2021b) maintain a weighted4
+sum of covariance matrix (X
+(j)
+i
+)
+⊤X
+(j)
+i
+, where i ranges over previous
+tasks 1, . . . , t − 1, and then extract an orthonormal basis matrix K(j)
+the nullspace of some low-rank approximation of this
+weighted sum. Such K(j) would be the desired K
+(j)
+t−1
+defined above, if the intersection ∩
+t−1
+i=1null(X
+(j)
+i
+) were not empty. On
+the other hand, Saha et al. (2021) maintain an orthonormal basis for a low-rank approximation of [(X
+(j)
+1
+)
+⊤, . . . ,(X
+(j)
+t−1
+)
+⊤],
+and they project the gradient onto the orthogonal complement of the subspace spanned by this basis. In light of (20), the
+methods of Saha et al. (2021) and Wang et al. (2021b) are in principle equivalent, and their difference in performance (as
+reported by Kong et al. (2022)) relies on implementation details. Furthermore, their approaches are dual to each other and
+are the two sides of the same coin: Wang et al. (2021b) (approximately) maintains a basis for ∩
+t−1
+i=1null(X
+(j)
+i
+) and Saha et al.
+(2021) for the orthogonal complement of ∩
+t−1
+i=1null(X
+(j)
+i
+); see Appendix G for another example of this duality.
+We stress that the provable success of these methods relies on Assumption 1, or otherwise pathological cases might arise;
+recall Example 1 (Past = Present) and see Lin et al. (2022a) for a different example. Finally, we refer the reader to Kong
+et al. (2022); Liu & Liu (2022); Lin et al. (2022a) for further developments on this line of research.
+D.2. Theoretical Aspects of Continual Learning Through The Lens of Task Relationship
+In order to develop any useful theory for continual learning or related problems that involve multiple tasks, the first step is to
+make suitable assumptions on the task relationship (or task similarity, or task relatedness). In the literature, there are several
+candidate assumptions available for modeling the task relationship, which we review here.
+One early assumption on the task relationship is given by Baxter (2000) in the context of learning to learn, who assumed a
+statistical data and task generation model such that, a hypothesis space that contains good solutions for a new task can be
+learned from sufficiently many samples of old tasks. An analogous example can be made in our context: ICL†
+learns Kt
+from old tasks, which serves as the hypothesis space for the next task.
+The task relationship proposed by Ben-David & Borbely (2008) involves a family of functions F. Ben-David & Borbely
+(2008) define two tasks as F-related if the data generation distribution of one task can be transformed into that of the other
+by some function in F. This assumption is adopted recently by Ramesh & Chaudhari (2022) and Prado & Riddle (2022)
+to provide insights on generalization for continual learning. A drawback of this assumption is that the F-relatedness is
+typically characterized by an abstract and combinatorial notion of the generalized VC dimension, which in our opinion is
+less intuitive and less “tangible” than Assumptions 1 and 2.
+Lee et al. (2021) and Asanuma et al. (2021) contextualize the task relationship in a teacher-student network setup. The tasks
+4
+In principle (say if the nullspaces of X
+(j)
+i
+intersect), different weights would result in the same nullspace.
+
+The Ideal Continual Learner (ICL)
+are defined by the teacher networks and the similarity of two given tasks is quantified by the difference in the weights of the
+two corresponding teacher networks. It appears to us that the insights Lee et al. (2021) and Asanuma et al. (2021) delivered
+under this teacher-student assumption are now limited to only two tasks.
+Yet another task relationship is that every objective Lt is the composition of two functions ft ◦ g, where the function
+g : R
+n → R
+s
+is referred to as the shared representation; see, e.g., Maurer et al. (2016); Balcan et al. (2015); Tripuraneni
+et al. (2021); Du et al. (2021). The point is that, if g has been learned from old tasks and fixed, and if n ≫ s, learning a
+new task would be more sample-efficient as the dimension of the search space reduces from n to a much smaller s. Li et al.
+(2022) and Cao et al. (2022) recently explored this idea in the continual learning context with certain new insights, while
+their settings are from ours. It is possible to obtain stronger generalization bounds and improve our results by leveraging this
+assumption of a shared representation, at the cost of obtaining a less general theorem than Theorems 1 and 2.
+The task relationship that we consider in this paper is defined by Assumption 1 or 2, that is all tasks share at least a common
+global minimizer. As mentioned in the main paper, this assumption generalizes those of Evron et al. (2022) and Peng &
+Risteski (2022). While we show that Assumptions 1 and 2 are quite powerful and leads to many pleasant results, in the
+future we would like to study how strong Assumption 1 or 2 is for continual learning and come up with other alternatives.
+E. Set-Theoretical Estimation
+In the main paper, we mentioned that ICL†
+is related to set-theoretical estimation in control. Here, we elaborate on this
+statement by reviewing related works and interpreting ICL†
+from a control and set-theoretical perspective.
+E.1. Ideal Continual Learner† = Predictor + Corrector
+State estimation is a fundamental problem in control. From the data D0, D1, . . . , DT observed sequentially over time and
+the initial state w0 ∈ W ⊂ R
+n, the goal of state estimation is to estimate the subsequent states w1, . . . , wT ∈ R
+n, assuming
+the following equations5
+:
+wt = ft−1(wt−1)
+Dt−1 = ht−1(wt−1)
+t = 1, . . . , T (28)
+Here, ft is some known function that transfer state wt into wt+1, and ht is a known function that maps state wt into our
+observation Dt. Of course, T is allowed to be ∞.
+Since the initial state w0 belongs to W and the subsequent state wt fulfills (28), wt must belong to some set depending
+on W, data D0, . . . , DT , and (28). Such dependency was described by Witsenhausen (1968) in the case where ft−1 and
+ht−1 are linear maps, and was made mathematically precise by Kieffer et al. (1998) with a recursive algorithm. Defining
+K0 ← W, the algorithm of Kieffer et al. (1998) consists of two steps for every t = 1, . . . , T:
+(Prediction) Gt ← ft−1(Kt−1)
+(Correction) Kt ← h
+−1
+t
+(Dt) ∩ Gt
+In words, the prediction step collects all possible states Gt that can be transferred from Kt−1, and the correction step rules
+out the states that are inconsistent with data Dt.
+In light of Kieffer et al. (1998) and as the notations suggest, we have the following description of ICL†
+:
+Proposition 10 (Ideal Continual Learner† = Predictor + Corrector). Under Assumption 1, the recursion (2) of ICL†
+is
+equivalent to
+(Prediction) Gt ← argmin
+w∈W
+Lt(w; Dt)
+(Correction) Kt ← Kt−1 ∩ Gt
+(29)
+The prediction step (29) involves solving a single task, while the correction step requires computing the intersection of two
+complicated sets. Finally, the prediction-correction description also requires storing the knowledge representation Kt.
+5This is a simplified model, e.g., we did not describe the control signals that enable state transfer, but this is enough for illustration.
+21
+The Ideal Continual Learner (ICL)
+E.2. Ideal Continual Learner† = Set Intersection Learner†?
+Background. Combettes (1993) formulated a general estimation problem that encompasses many signal processing and
+control applications. The formulation of Combettes (1993) can be described as follows. Suppose we are given some
+information D1, . . . , DT , from which we want to estimate a certain variable wˆ. Each piece of information Dt determines
+a set Gt in which w∗
+lies. Assuming we can compute Gt from Dt, the problem of estimating wˆ reduces to computing (a
+point of) the set intersection ∩
+T
+t=1Gt. If the information we have is inconsistent (e.g., due to noise or out-of-distribution
+measurements), the intersection ∩
+T
+t=1Gt might be empty. This is a more challenging situation, which might result in an
+NP-hard problem (as we discussed in the main paper). As in Assumption 1, we assume ∩
+T
+t=1Gt is non-empty, therefore the
+difficulty of finding a point in ∩
+T
+t=1Gt largely depends on the shape of each set Gt.
+Computing Set Intersections. Suppose ∩
+T
+t=1Gt ̸= ∅. Finding a point in ∩
+T
+t=1Gt is a classic problem and has been of great
+interest nowadays due to many modern applications. Classic methods include the alternating projection method of John von
+Neumann in 1933 for the case of two intersecting affine subspaces (as Lindstrom & Sims (2021) surveyed); the methods of
+Karczmarz (1937) and Cimmino (1938) for the case where Gt’s are finitely many affine hyperplanes (as Combettes (1993)
+reviewed); the method of Boyle & Dykstra (1986) for computing a point in the intersection of two convex sets; as well as
+many extensions of these methods for finitely many convex sets and even non-convex sets. We refer the reader to Borwein &
+Tam (2014) for some equivalence among these methods and to Theodoridis et al. (2010); Lindstrom & Sims (2021) and
+some references of Borwein & Tam (2014) for surveys. See also Evron et al. (2022) where some extensions of Karczmarz
+(1937) were discussed in a continual learning context.
+The Continual Learning Context. The Ideal Continual Learner†
+(ICL†
+) might be viewed as a method that computes the
+set Gt of global minimizes for each task t and then computes their intersection ∩
+T
+t=1Gt. If all objectives Lt’s are convex,
+then in general Gt is a convex set, and it is possible to implement ICL† via computing intersections of convex sets. However,
+there are still several issues that make the continual learning problem harder than computing set intersections:
+• The first difficulty is to find a representation of Gt that is amenable to alternating optimization (we discussed several
+equivalent representations of Gt in §2). Such representation should consume as less memory as possible, and yet might
+purely rely on a user’s choice; e.g., one might revisit past tasks as an implicit way of storing Gt (Evron et al., 2022).
+• The other difficulty occurs when there are infinitely many tasks (T = ∞), and this basically rules out the chance of
+storing all sets Gt’s. Similar issues have been considered in the signal processing context, where one is given the set
+Gt sequentially; see Theodoridis et al. (2010) for a review. However, theoretical guarantees of existing methods in
+that line of research are about convergence to ∩∞
+t=t0
+Gt for some number t0 (potentially unknown), not to ∩∞
+t=1Gt. The
+reason that t0 is in general unknown is this: These methods are some variants of alternating projections, which might
+forget the very first set G1 after projecting onto later sets.
+F. Streaming PCA, Incremental SVD, and Subspace Tracking
+As mentioned in the main paper, the continual matrix factorization formulation is related to several classic problems,
+streaming principal component analysis (PCA), incremental singular value decomposition (SVD), and subspace tracking.
+These problems have been extensively studied in machine learning, numerical linear algebra, and signal processing
+communities. While we refer the reader to Balzano et al. (2018) and Vaswani et al. (2018) for comprehensive reviews, we
+discuss several related methods here, aiming at highlighting their connections to continual learning.
+Streaming PCA. PCA refers to modeling a data matrix [Y1 · · · YT ] with some low-dimensional subspace, and it is a
+century-old topic (Pearson, 1901) that has many applications and extensions (Jolliffe, 2002; Vidal et al., 2016). Streaming
+PCA differs from PCA in that one receives Y1, . . . , YT sequentially, and each Yt is seen only once. A popular method for
+streaming PCA is due to Oja (1982). Assume we want to project the data onto a r-dimensional subspace of R
+n, with r a
+hyper-parameter. The method of Oja (1982) initializes a random orthonormal matrix U(1) ∈ R
+n×r
+, updates
+U
+(k+1) ← orth
+U
+(k) + γ
+(k)YkY
+⊤
+k U
+(k)
+
+(30)
+at iteration k with stepsize γ
+(k)
+. Here orth(·) orthogonalizes an input matrix (e.g., via QR or SVD decomposition). The
+update (30) can be regarded as a stochastic projected gradient descent method; in particular, γ
+(k) → ∞, then (30) becomes
+22
+The Ideal Continual Learner (ICL)
+a stochastic version of the power method that computes r eigenvectors of [Y1 · · · YT ] corresponding to r maximum
+eigenvalues. Similarly to SGD or the algorithm of Evron et al. (2022), in the worse case, this stochastic method forgets if it
+does not revisit past data, and even if [Y1 · · · YT ] is exactly of rank r; note that we did not give a formal proof for this
+claim, but it can be derived by combining the minimality of Kt (§2.3) with problem-specific arguments.
+Incremental SVD. The incremental SVD problem is to compute the SVD of [Y1 Y2] from the SVD of a matrix Y1 =
+U1Σ1V
+⊤
+1
+. This is a different and slightly more difficult goal from continual matrix factorization, which aims to estimate
+(an orthonormal basis matrix of) a subspace sum. Of course, we could do incremental SVD for increasingly more data,
+and extract the desired basis matrix from the final SVD decomposition of [Y1 · · · Yt]; in other words, incremental SVD
+algorithms can be used to solve the continual matrix factorization problem. The issue is that it takes more memory to store
+the SVD than storing only a basis matrix as in our approach, and potentially takes more time for computation.
+To better understand the matter, we review a popular incremental SVD method, described in Section 3 of Brand (2002) (see
+also Bunch & Nielsen (1978)). With Y2 := (I − U1U ⊤
+1
+)Y2 and a QR-decomposition Q2R2 = Y2 of Y2, we have
+[Y1 Y2] = [U1Σ1V
+⊤
+1 Y2]
+= [U1 Q2]
+
+Σ1 U ⊤
+1 Y2
+0 R2
+ V1 0
+0 I
+⊤
+Since [U1 Q2] and 
+V1 0
+0 I
+
+have orthonormal columns, computing the SVD of [Y1 Y2] reduces to computing the SVD
+U2Σ2V
+⊤
+2 of the middle matrix 
+Σ1 U ⊤
+1 Y2
+0 R2
+
+. Indeed, with SVD U2Σ2V
+⊤
+2
+, we can obtain the desired decomposition of
+[Y1 Y2] as U2Σ2V
+⊤
+2
+, where U2 and V2 are defined as
+U2 ← [U1 Q2]U2, V2 = V1V2. (31)
+Note that this approach can also be regarded as an expansion-based method, and by design it never forgets when applied to
+continual matrix factorization. However, it requires an extra QR decomposition, and it requires an SVD on a larger matrix
+than in our approach (§3.2). A subtler drawback is that this method performs SVD and then multiplication (31) to obtain the
+orthonormal basis. This is potentially numerically unstable; as Brand (2006) later commented:
+Over thousands or millions of updates, the multiplications may erode the orthogonality of U′
+[e.g., U2] through numerical
+error... [Brand (2006) described some ad-hoc remedy] ... It is an open question how often this is necessary to guarantee a
+certain overall level of numerical precision.
+This numerical issue does not exist in our approach, where our multiplication is followed by an SVD; then from the SVD we
+directly extract the desired basis matrix, which is typically orthonormal up to machine accuracy given the numerical stability
+of SVD algorithms (preconditioned if necessary). The reason that we could do so, though, stems from the fact that we need
+only to compute an orthonormal basis of the subspace sum S1 + · · · + St for the continual matrix factorization problem,
+which is arguably simpler than incrementally updating the SVD. As a final remark, our approach can be extended to update
+the U and V matrices for incremental SVD, at the potential cost that updating the singular values could be numerically
+unstable. Nevertheless, discussing these is beyond the scope of the paper, and hence we omit the details.
+Subspace Tracking. Suppose now we receive data Y1, . . . , YT sequentially, with St = range(Yt). In the problem of
+subspace tracking, we assume St changes slowly, as t increases, and the goal at task t or time t is to estimate St. To do so, a
+classic idea (e.g., see Yang (1995; 1996)) is to define a forgetting factor β with 0 ≪ β ≤ 1, and minimize the following
+objective in a streaming fashion:
+min
+U
+X
+T
+t=1
+β
+T −t
+∥Yt − UU ⊤Yt∥
+2
+F
+. (32)
+Here, the forgetting factor β discounts the previous samples, accounting for the fact that St is slowly changing; more
+generally, such factor β also appears in many classic reinforcement learning algorithms as a discount rate to discount
+the past rewards (Sutton & Barto, 2018). There are also works that make mathematically precise assumptions on how
+23
+The Ideal Continual Learner (ICL)
+St changes over time. For example, St could be slowly rotated, or keep static for a sufficiently long time until changing
+(Narayanamurthy & Vaswani, 2018). Intuitively, making how St changes precise give chances to design better algorithms,
+although we shall not review these approaches. The point here is that, this classic line of research furnished the very
+rudimentary idea of what is recently known as selective forgetting or active forgetting in the deep continual learning context
+(Aljundi et al., 2018; Wang et al., 2021a; Shibata et al., 2021; Liu et al., 2022). Of course, achieving selective or active
+forgetting in a principled way for deep continual learning is much harder than for subspace tracking.
+G. A Dual Approach to Continual Principal Component Analysis
+Background. In §3.2, we considered continual matrix factorization where task t is associated with the loss
+Lt
+
+(U, C);Yt
+
+= ∥UC − Yt∥
+2
+F
+, and this loss is equivalent to a PCA objective ∥UU ⊤Yt − Yt∥
+2
+F
+in variable U, assuming U ⊤U is the identity matrix. Since U gradually grows its columns to accommodate new tasks, this might eventually
+consume too much memory. As promised in Remark 5, we now address this issue, using the following key observation:
+If U and B are orthonormal basis matrices2 of some linear subspace and its orthogonal complement, respectively, then
+UU ⊤ + BB⊤ is the identity matrix, and we have
+∥UU ⊤Yt − Yt∥
+2
+F = ∥BB⊤Yt∥
+2
+F = ∥Y
+⊤
+t B∥
+2
+F
+. (33)
+Note that relation (33) was discussed by Tsakiris & Vidal (2018) in a different context, in comparison to the algorithm of
+Lerman et al. (2015). In that line of research, U is typically referred to as the primal representation of the subspace St and
+B the dual representation. To conclude, we can use ∥Y
+⊤
+t B∥
+2
+F
+as the objective for task t, and the aim for task t is to find an
+orthonormal basis matrix for subspace S
+⊥
+t
+, which is uniquely identified with St. The goal of continual principal component
+analysis is to find the subspace intersection ∩
+t
+i=1S
+⊥
+i
+upon encountering task t (∀t).
+Implementing The Ideal Continual Learner†
+. We now describe ICL†
+for solving the problem of continual PCA. Denote
+by Bt a basis matrix for ∩
+t
+i=1S
+⊥
+i with B⊤
+t Bt = I, we have ∥Y
+⊤
+i Bt∥F = 0 for every i = 1, . . . , t. Therefore, for each
+task, we maintain and update Bt. To start with, set B1 to be the matrix whose columns are all right singular vectors of Y
+⊤
+t
+corresponding to its zero singular values. Suppose now t > 1 and we are given Bt−1 and Yt, and we wish to compute a Bt.
+Of course ∩
+t
+i=1S
+⊥
+i ⊂ ∩t−1
+i=1S
+⊥
+i
+, hence Bt has fewer or equal columns than Bt−1 and each column of Bt can be represented
+as a linear combination of columns of Bt−1. Therefore, parameterize Bt as Bt = Bt−1Ct, and we solve
+Ct ∈ argmin
+Ct
+∥Y
+⊤
+t Bt−1Ct∥
+2
+F
+s.t. (Bt−1Ct)
+⊤Bt−1Ct = I
+⇔ Ct ∈ argmin
+Ct
+∥Y
+⊤
+t Bt−1Ct∥
+2
+F
+s.t. C
+⊤
+t Ct = I,
+where the equivalence is due to B⊤
+t−1Bt−1 = I. As a result, we can set Ct to be the matrix whose columns are all right
+singular vectors of Y
+⊤
+t Bt−1 corresponding to its zero singular values. This concludes how ICL†
+can be implemented for
+continual PCA.
+Summary. We now see two sides of the same coin: We can implement ICL†
+for continual matrix factorization (or continual
+PCA), using either the primal or dual representation. The primal representation (Ut) grows while the dual representation
+(Bt) shrinks. This is not to say that the dual representation is always better. The dual representation saves memory (and is
+thus preferred) if and only if dim(Pt
+i=1 Si) exceeds half of the ambient dimension. Hence, a better implementation for
+continual matrix factorization (or continual PCA) would switch the representation from primal to dual, as t increases such
+that dim(Pt
+i=1 Si) is greater than that threshold. Nevertheless, the total memory needed in both representations is bounded
+above by n × dim(Pt
+i=1 Si). This seems to contradict the results of Knoblauch et al. (2020) and Chen et al. (2022), which
+suggest that continual learning without forgetting would require memory to grow linearly with the number T of tasks. The
+catch is that, besides other differences in settings, their results are for the worst-case scenario, while our continual matrix
+factorization or continual PCA setting is quite specific and does not belong to the worst case.
+H. Proofs
+Proof of Proposition 1. Clearly K1 = G1. Assume Kt−1 = ∩
+t−1
+i=1Gi
+. Since Lt is minimized over Gt (1) and ∩
+t
+i=1Gi ̸= ∅,
+the set of global minimizers of (2) is ∩
+t
+i=1Gi
+. By definition (2) we have Kt = ∩
+t
+i=1Gi
+. The proof is complete by
+induction.
+2
+The Ideal Continual Learner (ICL)
+Proof of Proposition 4. Let wˆt ∈ Kt = ∩
+t
+i=1Gi
+, then we have
+min
+w∈W
+Xt
+i=1
+αiLi(w; Di) ≥
+Xt
+i=1
+αi min
+w∈W
+Li(w; Di)
+=
+Xt
+i=1
+αiLi(wˆt; Di).
+(34)
+Since wˆt is feasible to the multitask objective (5), the minimum value of the multitask objective is attained exactly when
+each objective Li
+is minimized, meaning that Kt is the set of global minimizers of the multitask objective.
+Proof of Theorem 1. Assumption 1 and Proposition 1 imply wˆ is a common global minimizer of all empirical tasks (1). For
+t = 1, . . . , T, let w∗
+t ∈ G∗
+t be a global minimizer of learning task t (12). Applying a union bound to (14), we get
+Ed∼Dt
+[ℓt(wˆ; d)] − Lt(wˆ; Dt) ≤ ζ(mt, δ′
+),
+Lt(w∗
+t
+; Dt) − Ed∼Dt
+[ℓt(w∗
+t
+; d)] ≤ ζ(mt, δ′
+),
+(35)
+for all t = 1, . . . , T, with probability at least 1 − T δ′
+. Summing up the inequalities of (35) and noticing Lt(wˆ; Dt) ≤
+Lt(w∗
+t
+; Dt) and c
+∗
+t = Ed∼Dt
+[ℓt(w∗
+t
+; d)], we then obtain
+Ed∼Dt
+[ℓt(wˆ; d)] ≤ c
+∗
+t + 2ζ(mt, δ′
+) = c
+∗
+t + ζ(mt, δ′
+).
+The last equality is due to the big-O notation (14). With δ := δ
+′/T we finish the proof.
+Proof of Proposition 5. Given (X1, y1), we can compute K1 via an SVD on X1, e.g., set K1 to be the matrix whose
+columns are right singular vectors of X1 corresponding to its zero singular values. We can compute a particular solution
+wˆ1 := X
+†
+1y1 to the normal equations X⊤
+1 X1w = X⊤
+1 y1; here X
+†
+1
+denotes the pseudoinverse of X1, and can be computed
+from SVD of X1.
+For the case t > 1, suppose we are given (wˆt−1, Kt−1) and data (Xt, yt). Then, by the definitions of (wˆt−1, Kt−1) and
+Kt−1, the equivalence between (7) and (8) is immediate.
+The normal equations of (8) are given by (Xt := XtKt−1)
+X
+⊤
+t Xta = X
+⊤
+t
+(yt − Xtwˆt−1).
+Therefore, we can compute aˆt = X
+†
+t
+(yt − Xtwˆt−1) as a global minimizer of (8), where the pseudoinverse X
+†
+t
+can be
+calculated via an SVD on Xt. Then a common global minimizer wˆt ∈ Kt is given as wˆt = wˆt−1 + Kt−1aˆt. It remains to
+compute an orthonormal basis matrix Kt for the intersection of the nullspaces of X1, . . . , Xt, that is the intersection of the
+nullspace of Xt and the range space of Kt−1. This can be done as follows. First, compute an orthonormal basis for the
+nullspace of Xt, then left-multiply this basis by Kt−1. This yields the desired Kt.
+Proof of Proposition 7. The proof is obtained in the same way as in Theorem 1, by exchanging the empirical part (e.g.,
+Lt(w, Dt) and ct) with the population part (e.g., Ed∼Dt
+[ℓt(w; d)] and c
+∗
+t
+).
+Proof of Theorem 2. The feasibility of the relaxed Continual Learner†
+follows from Proposition 7, which also suggests that
+Lt(w; Dt) ≤ ct + ζ(mt, δ/T), ∀t = 1, . . . , T (36)
+with probability at least 1 − δ. Note that in (36) the uniform convergence bound of Assumption 3 was invoked for each task,
+meaning that we have Ed∼Dt
+[ℓt(w; d)] ≤ Lt(w; Dt) + ζ(mt, δ/T) and ct ≤ c
+∗
+t + ζ(mt, δ/T). Substitute them into (36)
+to get Ed∼Dt
+[ℓt(w; d)] ≤ c
+∗
+t + 3ζ(mt, δ/T), finishing the proof.
+Proof of Theorem 3. By Proposition 7, with probability at least 1 − δ, we have w satisfying
+1
+mT
+XmT
+i=1
+ℓT (w; dT i) +
+T
+X−1
+t=1
+1
+st
+Xst
+i=1
+ℓt(w; dti) ≤ cT + ζ(mT , δ/T) +
+T
+X−1
+t=1
+
+cˆt + ζ(st, δ/T)
+
+,
+2
+The Ideal Continual Learner (ICL)
+where cˆt is the minimum of 1
+st
+Pst
+i=1 ℓt(w; dti) over W, and cT the minimum of 1
+mT
+PmT
+i=1 ℓT (w; dT i) over W. Then, the
+proof technique of Theorem 2 implies (19), and the proof is complete.

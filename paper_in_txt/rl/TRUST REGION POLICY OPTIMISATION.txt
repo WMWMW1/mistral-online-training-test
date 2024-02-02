@@ -1,0 +1,3873 @@
+TRUST REGION POLICY OPTIMISATION IN
+MULTI-AGENT REINFORCEMENT LEARNING
+Jakub Grudzien Kuba1,2∗
+, Ruiqing Chen3,∗
+, Muning Wen4
+, Ying Wen4
+,
+Fanglei Sun3
+, Jun Wang5
+, Yaodong Yang6,†
+1University of Oxford, 2Huawei R&D UK, 3ShanghaiTech University,
+4Shanghai Jiao Tong University 5University College London
+6
+Institute for AI, Peking University & BIGAI
+†Corresponding to: yaodong.yang@pku.edu.cn
+ABSTRACT
+Trust region methods rigorously enabled reinforcement learning (RL) agents to
+learn monotonically improving policies, leading to superior performance on a variety of tasks. Unfortunately, when it comes to multi-agent reinforcement learning
+(MARL), the property of monotonic improvement may not simply apply; this is
+because agents, even in cooperative games, could have conflicting directions of
+policy updates. As a result, achieving a guaranteed improvement on the joint
+policy where each agent acts individually remains an open challenge. In this paper, we extend the theory of trust region learning to cooperative MARL. Central
+to our findings are the multi-agent advantage decomposition lemma and the sequential policy update scheme. Based on these, we develop Heterogeneous-Agent
+Trust Region Policy Optimisation (HATPRO) and Heterogeneous-Agent Proximal Policy Optimisation (HAPPO) algorithms. Unlike many existing MARL algorithms, HATRPO/HAPPO do not need agents to share parameters, nor do they
+need any restrictive assumptions on decomposibility of the joint value function.
+Most importantly, we justify in theory the monotonic improvement property of
+HATRPO/HAPPO. We evaluate the proposed methods on a series of Multi-Agent
+MuJoCo and StarCraftII tasks. Results show that HATRPO and HAPPO significantly outperform strong baselines such as IPPO, MAPPO and MADDPG on all
+tested tasks, thereby establishing a new state of the art.
+1 INTRODUCTION
+Policy gradient (PG) methods have played a major role in recent developments of reinforcement
+learning (RL) algorithms (Silver et al., 2014; Schulman et al., 2015a; Haarnoja et al., 2018). Among
+the many PG variants, trust region learning (Kakade & Langford, 2002), with two typical embodiments of Trust Region Policy Optimisation (TRPO) (Schulman et al., 2015a) and Proximal Policy
+Optimisation (PPO) (Schulman et al., 2017) algorithms, offer supreme empirical performance in
+both discrete and continuous RL problems (Duan et al., 2016; Mahmood et al., 2018). The effectiveness of trust region methods largely stems from their theoretically-justified policy iteration
+procedure. By optimising the policy within a trustable neighbourhood of the current policy, thus
+avoiding making aggressive updates towards risky directions, trust region learning enjoys the guarantee of monotonic performance improvement at every iteration.
+In multi-agent reinforcement learning (MARL) settings (Yang & Wang, 2020), naively applying
+policy gradient methods by considering other agents as a part of the environment can lose its effectiveness. This is intuitively clear: once a learning agent updates its policy, so do its opponents;
+this however changes the loss landscape of the learning agent, thus harming the improvement effect
+from the PG update. As a result, applying independent PG updates in MARL offers poor convergence property (Claus & Boutilier, 1998). To address this, a learning paradigm named centralised
+training with decentralised execution (CTDE) (Lowe et al., 2017b; Foerster et al., 2018; Zhou et al.,
+2021) was developed. In CTDE, each agent is equipped with a joint value function which, during
+∗
+First two authors contribute equally. Code is available at https://github.com/cyanrain7/
+Trust-Region-Policy-Optimisation-in-Multi-Agent-Reinforcement-Learning.
+1
+arXiv:2109.11251v2 [cs.AI] 4 Apr 2022
+Published as a conference paper at ICLR 2022
+training, has access to the global state and opponents’ actions. With the help of the centralised value
+function that accounts for the non-stationarity caused by others, each agent adapts its policy parameters accordingly. As such, the CTDE paradigm allows a straightforward extension of single-agent
+PG theorems (Sutton et al., 2000; Silver et al., 2014) to multi-agent scenarios (Lowe et al., 2017b;
+Kuba et al., 2021; Mguni et al., 2021). Consequently, fruitful multi-agent policy gradient algorithms
+have been developed (Foerster et al., 2018; Peng et al., 2017; Zhang et al., 2020; Wen et al., 2018;
+2020; Yang et al., 2018).
+Unfortunately, existing CTDE methods offer no solution of how to perform trust region learning in
+MARL. Lack of such an extension impedes agents from learning monotonically improving policies
+in a stable manner. Recent attempts such as IPPO (de Witt et al., 2020a) and MAPPO (Yu et al.,
+2021) have been proposed to fill such a gap; however, these methods are designed for agents that are
+homogeneous (i.e., sharing the same action space and policy parameters), which largely limits their
+applicability and potentially harm the performance. As we show in Proposition 1 later, parameter
+sharing could suffer from an exponentially-worse suboptimal outcome. On the other hand, although
+IPPO/MAPPO can be practically applied in a non-parameter sharing way, it still lacks the essential
+theoretical property of trust region learning, which is the monotonic improvement guarantee.
+In this paper, we propose the first theoretically-justified trust region learning framework in MARL.
+The key to our findings are the multi-agent advantage decomposition lemma and the sequential policy update scheme. With the advantage decomposition lemma, we introduce a multi-agent policy
+iteration procedure that enjoys the monotonic improvement guarantee. To implement such a procedure, we propose two practical algorithms: Heterogeneous-Agent Trust Region Policy Optimisation
+(HATRPO) and Heterogeneous-Agent Proximal Policy Optimisation (HAPPO). HATRPO/HAPPO
+adopts the sequential update scheme, which saves the cost of maintaining a centralised critic for
+each agent in CTDE. Importantly, HATRPO/HAPPO does not require homogeneity of agents, nor
+any other restrictive assumptions on the decomposibility of the joint Q-function (Rashid et al., 2018).
+We evaluate HATRPO and HAPPO on benchmarks of StarCraftII and Multi-Agent MuJoCo against
+strong baselines such as MADDPG (Lowe et al., 2017a), IPPO (de Witt et al., 2020b) and MAPPO
+(Yu et al., 2021); results clearly demonstrate its state-of-the-art performance across all tested tasks.
+2 PRELIMINARIES
+In this section, we first introduce problem formulation and notations for MARL, and then briefly
+review trust region learning in RL and discuss the difficulty of extending it to MARL. We end by
+surveying existing MARL work that relates to trust region methods and show their limitations.
+2.1 COOPERATIVE MARL PROBLEM FORMULATION AND NOTATIONS
+We consider a Markov game (Littman, 1994), which is defined by a tuple hN , S, A, P, r, γi. Here,
+N = {1, . . . , n} denotes the set of agents, S is the finite state space, A =
+Qn
+i=1 Ai
+is the product
+of finite action spaces of all agents, known as the joint action space, P : S × A × S → [0, 1] is the
+transition probability function, r : S × A → R is the reward function, and γ ∈ [0, 1) is the discount
+factor. The agents interact with the environment according to the following protocol: at time step t ∈
+N, the agents are at state st ∈ S; every agent i takes an action ai
+t ∈ Ai
+, drawn from its policy π
+i
+(·|st),
+which together with other agents’ actions gives a joint action at = (a
+1
+t
+, . . . , a
+n
+t
+) ∈ A, drawn from the
+joint policy π(·|st) = Qn
+i=1 π
+i
+(·
+i
+|st); the agents receive a joint reward rt = r(st, at) ∈ R, and move
+to a state st+1 with probability P(st+1|st, at). The joint policy π, the transition probabililty function
+P, and the initial state distribution ρ
+0
+, induce a marginal state distribution at time t, denoted by ρ
+t
+π.
+We define an (improper) marginal state distribution ρπ ,
+P∞
+t=0 γ
+tρ
+t
+π. The state value function
+and the state-action value function are defined: Vπ(s) , Ea0:∞∼π,s1:∞∼P
+P∞
+t=0 γ
+t
+rt
+
+ s0 = s
+
+and
+Qπ(s, a) , Es1:∞∼P,a1:∞∼π
+P∞
+t=0 γ
+t
+rt
+
+ s0 = s, a0 = a
+
+. The advantage function is written
+as Aπ(s, a) , Qπ(s, a) − Vπ(s). In this paper, we consider a fully-cooperative setting where all
+agents share the same reward function, aiming to maximise the expected total reward:
+J(π) , Es0:∞∼ρ0:∞π ,a0:∞∼π
+"X∞
+t=0
+γ
+t
+rt
+#
+.
+Throughout this paper, we pay close attention to the contribution to performance from different
+subsets of agents. Before proceeding to our methods, we introduce following novel definitions.
+2
+Published as a conference paper at ICLR 2022
+Definition 1. Let i1:m denote an ordered subset {i1, . . . , im} of N , and let −i1:m refer to its complement. We write ik when we refer to the k
+th agent in the ordered subset. Correspondingly, the
+multi-agent state-action value function is defined as
+Q
+i1:m
+π
+
+s, a
+i1:m
+
+, Ea−i1:m∼π−i1:m
+h
+Qπ
+
+s, a
+i1:m, a
+−i1:m
+i ,
+and for disjoint sets j1:k and i1:m, the multi-agent advantage function is
+A
+i1:m
+π
+
+s, a
+j1:k
+, a
+i1:m
+
+, Q
+j1:k,i1:m
+π
+
+s, a
+j1:k
+, a
+i1:m
+
+− Q
+j1:k
+π
+
+s, a
+j1:k
+
+. (1)
+Hereafter, the joint policies π = (π
+1
+, . . . , πn) and π¯ = (¯π
+1
+, . . . , π¯
+n) shall be thought of as the
+“current”, and the “new” joint policy that agents update towards, respectively.
+2.2 TRUST REGION ALGORITHMS IN REINFORCEMENT LEARNING
+Trust region methods such as TRPO (Schulman et al., 2015a) were proposed in single-agent RL
+with an aim of achieving a monotonic improvement of J(π) at each iteration. Formally, it can be
+described by the following theorem.
+Theorem 1. (Schulman et al., 2015a, Theorem 1) Let π be the current policy and π¯ be
+the next candidate policy. We define Lπ(¯π) = J(π) + Es∼ρπ,a∼π¯ [Aπ(s, a)] , D
+max
+KL (π, π¯) =
+maxs DKL (π(·|s), π¯(·|s)). Then the inequality of
+J(¯π) ≥ Lπ(¯π) − CD
+max
+KL
+π, π¯
+
+(2)
+holds, where C =
+4γ maxs,a |Aπ(s,a)|
+(1−γ)
+2 .
+The above theorem states that as the distance between the current policy π and a candidate policy π¯
+decreases, the surrogate Lπ(¯π), which involves only the current policy’s state distribution, becomes
+an increasingly accurate estimate of the actual performance metric J(¯π). Based on this theorem, an
+iterative trust region algorithm is derived; at iteration k + 1, the agent updates its policy by
+πk+1 = arg max
+π
+
+Lπk
+(π) − CD
+max
+KL (πk, π)
+
+.
+Such an update guarantees a monotonic improvement of the policy, i.e., J(πk+1) ≥ J(πk). To implement this procedure in practical settings with parameterised policies πθ, Schulman et al. (2015a)
+approximated the KL-penalty with a KL-constraint, which gave rise to the TRPO update of
+θk+1 = arg max
+θ
+Lπθk
+(πθ), subject to Es∼ρπθk
+[DKL(πθk
+, πθ)] ≤ δ. (3)
+At each iteration k + 1, TRPO constructs a KL-ball Bδ(πθk
+) around the policy πθk
+, and optimises
+πθk+1 ∈ Bδ(πθk
+) to maximise Lπθk
+(πθ). By Theorem 1, we know that the surrogate objective
+Lπθk
+(πθ) is close to the true reward J(πθ) within Bδ(πθk
+); therefore, πθk
+leads to improvement.
+Furthermore, to save the cost on Es∼ρπθk
+[DKL(πθk
+, πθ)] when computing Equation (3), Schulman
+et al. (2017) proposed an approximation solution to TRPO that uses only first order derivatives,
+known as PPO. PPO optimises the policy parameter θk+1 by maximising the PPO-clip objective of
+L
+PPO
+πθk
+(πθ) = Es∼ρπθk
+,a∼πθk
+
+min 
+πθ(a|s)
+πθk
+(a|s)
+Aπθk
+(s, a), clip 
+πθ(a|s)
+πθk
+(a|s)
+, 1 ± 
+
+Aπθk
+(s, a)
+ . (4)
+The clip operator replaces the ratio πθ(a|s)
+πθk
+(a|s) with 1 + or 1−, depending on whether or not the ratio
+is beyond the threshold interval. This effectively enables PPO to control the size of policy updates.
+2.3 LIMITATIONS OF EXISTING TRUST REGION METHODS IN MARL
+Extending trust region methods to MARL is highly non-trivial. One naive approach is to equip all
+agents with one shared set of parameters and use agents’ aggregated trajectories to conduct policy
+optimisation at every iteration. This approach was adopted by MAPPO (Yu et al., 2021) in which
+the policy parameter θ is optimised by maximising the objective of
+L
+MAPPO
+πθk
+(πθ) = Xn
+i=1
+Es∼ρπθk
+,a∼πθk
+
+min 
+πθ(a
+i
+|s)
+πθk
+(a
+i
+|s)
+Aπθk
+(s, a), clip 
+πθ(a
+i
+|s)
+πθk
+(a
+i
+|s)
+, 1 ± 
+
+Aπθk
+(s, a)
+ .
+(5)
+
+Published as a conference paper at ICLR 2022
+Unfortunately, this simple approach has significant drawbacks. An obvious demerit is that parameter
+sharing requires that all agents have identical action spaces, i.e., Ai = Aj
+, ∀i, j ∈ N , which limits
+the class of MARL problems to solve. Importantly, enforcing parameter sharing is equivalent to
+putting a constraint θ
+i = θ
+j
+, ∀i, j ∈ N on the joint policy space. In principle, this can lead to a
+suboptimal solution. To elaborate, we demonstrate through an example in the following proposition.
+Proposition 1. Let’s consider a fully-cooperative game with an even number of agents n, one state,
+and the joint action space {0, 1}
+n, where the reward is given by r(0
+n/2
+, 1
+n/2
+) = r(1
+n/2
+, 0
+n/2
+) = 1,
+and r(a
+1:n) = 0 for all other joint actions. Let J
+∗ be the optimal joint reward, and J
+∗
+share be the
+optimal joint reward under the shared policy constraint. Then
+J
+∗
+share
+J
+∗ =
+2
+2
+n
+.
+For proof see Appendix B. In the above example, we show that parameter sharing can lead to a
+suboptimal outcome that is exponentially worse with the increasing number of agents. We also
+provide an empirical verification of this proposition in Appendix F.
+Apart from parameter sharing, a more general approach to extend trust region methods in
+MARL is to endow all agents with their own parameters, and at each iteration k + 1, agents
+construct trust regions of {Bδ(π
+i
+θ
+i
+k
+)}i∈N , and optimise their objectives {Lπθk
+(π
+i
+θiπ
+−i
+θ
+−i
+k
+)}i∈N .
+MAPPO
+& IPPO
+HATRPO
+& HAPPO
+Figure 1: Example of a twoplayer differentiable game with
+r(a
+1
+, a2
+) = a
+1a
+2
+. We initialise
+two Gaussian policies with µ
+1 =
+−0.25, µ
+2 = 0.25. The purple
+intervals represent the KL-ball of
+δ = 0.5. Individual trust region
+updates (red) decrease the joint return, whereas our sequential update (blue) leads to improvement.
+Admittedly, this approach can still be supported by the current
+MAPPO implementation (Yu et al., 2021) if one turns off parameter sharing, thus distributing the summation in Equation
+(5) to all agents. However, such an approach cannot offer a
+rigorous guarantee of monotonic improvement during training.
+In fact, agents’ local improvements in performance can jointly
+lead to a worse outcome. For example, in Figure 1, we design a
+single-state differential game where two agents draw their actions from Gaussian distributions with learnable means µ
+1
+, µ
+2
+and unit variance, and the reward function is r(a
+1
+, a2
+) = a
+1a
+2
+.
+The failure of MAPPO-style approach comes from the fact
+that, although the reward function increases in each of the
+agents’ (one-dimensional) update directions, it decreases in the
+joint (two-dimensional) update direction.
+Having seen the limitations of existing trust region methods in
+MARL, in the following sections, we first introduce a multiagent policy iteration procedure that enjoys theoreticallyjustified monotonic improvement guarantee. To implement
+this procedure, we propose HATRPO and HAPPO algorithms,
+which offer practical solutions to apply trust region learning in MARL without the necessity of assuming homogeneous agents while still maintaining the monotonic improvement property.
+3 MULTI-AGENT TRUST REGION LEARNING
+The purpose of this section is to develop a theoretically-justified trust region learning procedure in
+the context of multi-agent learning. In Subsection 3.1, we present the policy iteration procedure with
+monotonic improvement guarantee, and in Subsection 3.2, we analyse its properties during training
+and at convergence. Throughout the work, we make the following regularity assumptions.
+Assumption 1. There exists η ∈ R, such that 0 < η  1, and for every agent i ∈ N , the policy
+space Πi
+is η-soft; that means that for every π
+i ∈ Πi
+, s ∈ S, and a
+i ∈ Ai
+, we have π
+i
+(a
+i
+|s) ≥ η.
+3.1 TRUST REGION LEARNING IN MARL WITH MONOTONIC IMPROVEMENT GUARANTEE
+We start by introducing a pivotal lemma which shows that the joint advantage function can be decomposed into a summation of each agent’s local advantages. Importantly, this lemma offers a
+critical intuition behind the sequential policy-update scheme that our algorithms later apply.
+Lemma 1 (Multi-Agent Advantage Decomposition). In any cooperative Markov games, given a
+joint policy π, for any state s, and any agent subset i1:m, the below equations holds.
+A
+i1:m
+π
+
+s, a
+i1:m
+
+=
+Xm
+j=1
+A
+ij
+π
+
+s, a
+i1:j−1
+, aij
+
+.
+
+Published as a conference paper at ICLR 2022
+For proof see Appendix C.2. Notably, Lemma 1 holds in general for cooperative Markov games,
+with no need for any assumptions on the decomposibility of the joint value function such as those in
+VDN (Sunehag et al., 2018), QMIX (Rashid et al., 2018) or Q-DPP (Yang et al., 2020).
+Lemma 1 indicates an effective approach to search for the direction of performance improvement
+(i.e., joint actions with positive advantage values) in multi-agent learning. Specifically, let agents
+take actions sequentially by following an arbitrary order i1:n, assuming agent i1 takes an action a¯
+i1
+such that A
+i1 (s, a¯
+i1 ) > 0, and then, for the rest m = 2, . . . , n, the agent im takes an action a¯
+im
+such that A
+im(s, a¯
+i1:m−1
+, a¯
+im) > 0. For the induced joint action a¯, Lemma 1 assures that Aπθ
+(s, a¯)
+is positive, thus the performance is guaranteed to improve. To formally extend the above process
+into a policy iteration procedure with monotonic improvement guarantee, we need the following
+definitions.
+Definition 2. Let π be a joint policy, π¯
+i1:m−1 =
+Qm−1
+j=1 π¯
+ij be some other joint policy of agents
+i1:m−1, and πˆ
+im be some other policy of agent im. Then
+L
+i1:m
+π
+
+π¯
+i1:m−1
+, πˆ
+im
+
+, Es∼ρπ,a
+i1:m−1∼π¯
+i1:m−1 ,a
+im∼πˆ
+im
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+ .
+Note that, for any π¯
+i1:m−1
+, we have
+L
+i1:m
+π
+
+π¯
+i1:m−1
+, πim
+
+= Es∼ρπ,a
+i1:m−1∼π¯
+i1:m−1 ,a
+im∼πim
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+
+= Es∼ρπ,a
+i1:m−1∼π¯
+i1:m−1
+
+Ea
+im∼πim
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+ = 0. (6)
+Building on Lemma 1 and Definition 2, we can finally generalise Theorem 1 of TRPO to MARL.
+Lemma 2. Let π be a joint policy. Then, for any joint policy π¯, we have
+J(π¯) ≥ J(π) + Xn
+m=1
+
+L
+i1:m
+π
+
+π¯
+i1:m−1
+, π¯
+im
+
+− CD
+max
+KL (π
+im, π¯
+im)
+
+.
+For proof see Appendix C.2. This lemma provides an idea about how a joint policy can be improved.
+Namely, by Equation (6), we know that if any agents were to set the values of the above summands
+L
+i1:m
+π (π¯
+i1:m−1
+, π¯
+im) − CD
+max
+KL (π
+im, π¯
+im) by sequentially updating their policies, each of them can
+always make its summand be zero by making no policy update (i.e., π¯
+im = π
+im). This implies
+that any positive update will lead to an increment in summation. Moreover, as there are n agents
+making policy updates, the compound increment can be large, leading to a substantial improvement.
+Lastly, note that this property holds with no requirement on the specific order by which agents
+make their updates; this allows for flexible scheduling on the update order at each iteration. To
+summarise, we propose the following Algorithm 1. We want to highlight that the algorithm is
+Algorithm 1 Multi-Agent Policy Iteration with Monotonic Improvement Guarantee
+1: Initialise the joint policy π0 = (π
+1
+0
+, . . . , πn
+0
+).
+2: for k = 0, 1, . . . do
+3: Compute the advantage function Aπk
+(s, a) for all state-(joint)action pairs (s, a).
+4: Compute  = maxs,a |Aπk
+(s, a)| and C =
+4γ
+(1−γ)
+2 .
+5: Draw a permutaion i1:n of agents at random.
+6: for m = 1 : n do
+7: Make an update π
+im
+k+1 = arg maxπim
+h
+L
+i1:m
+πk
+
+π
+i1:m−1
+k+1 , πim
+
+− CD
+max
+KL (π
+im
+k
+, πim)
+i
+.
+8: end for
+9: end for
+markedly different from naively applying the TRPO update, i.e., Equation (3), on the joint policy of
+all agents. Firstly, our Algorithm 1 does not update the entire joint policy at once, but rather update
+each agent’s individual policy sequentially. Secondly, during the sequential update, each agent has a
+unique optimisation objective that takes into account all previous agents’ updates, which is also the
+key for the monotonic improvement property to hold.
+3.2 THEORETICAL ANALYSIS
+Now we justify by the following theorm that Algorithm 1 enjoys monotonic improvement proper
+Published as a conference paper at ICLR 2022
+Theorem 2. A sequence (πk)
+∞
+k=0 of joint policies updated by Algorithm 1 has the monotonic improvement property, i.e., J(πk+1) ≥ J(πk) for all k ∈ N.
+For proof see Appendix C.2. With the above theorem, we finally claim a successful introduction of
+trust region learning to MARL, as this generalises the monotonic improvement property of TRPO.
+Moreover, we take a step further to study the convergence property of Algorithm 1. Before stating
+the result, we introduce the following solution concept.
+Definition 3. In a fully-cooperative game, a joint policy π∗ = (π
+1
+∗
+, . . . , πn
+∗
+) is a Nash equilibrium
+(NE) if for every i ∈ N , π
+i ∈ Πi
+implies J (π∗) ≥ J
+
+π
+i
+,π
+−i
+∗
+
+.
+NE (Nash, 1951) is a well-established game-theoretic solution concept. Definition 3 characterises
+the equilibrium point at convergence for cooperative MARL tasks. Based on this, we have the
+following result that describes Algorithm 1’s asymptotic convergence behaviour towards NE.
+Theorem 3. Supposing in Algorithm 1 any permutation of agents has a fixed non-zero probability to
+begin the update, a sequence (πk)
+∞
+k=0 of joint policies generated by the algorithm, in a cooperative
+Markov game, has a non-empty set of limit points, each of which is a Nash equilibrium.
+For proof see Appendix C.3. In deriving this result, the novel details introduced by Algorithm 1
+played an important role. The monotonic improvement property (Theorem 2), achieved through the
+multi-agent advantage and the sequential update scheme, provided us with a guarantee on the convergence of the return. Furthermore, randomisation of the update order assured that, at convergence,
+none of the agents is incentified to make an update. The proof is finalised by excluding a possibility
+that the algorithm converges at non-equilibrium points.
+4 PRACTICAL ALGORITHMS
+When implementing Algorithm 1 in practice, large state and action spaces could prevent agents from
+designating policies π
+i
+(·|s) for each state s separately. To handle this, we parameterise each agent’s
+policy π
+i
+θ
+i by θ
+i
+, which, together with other agents’ policies, forms a joint policy πθ parametrised
+by θ = (θ
+1
+, . . . , θn). In this section, we develop two deep MARL algorithms to optimise the θ.
+4.1 HATRPO
+Computing Dmax
+KL
+π
+im
+θ
+im
+k
+, π
+im
+θ
+im
+
+in Algorithm 1 is challenging; it requires evaluating the KLdivergence for all states at each iteration. Similar to TRPO, one can ease this maximal KLdivergence penalty Dmax
+KL
+π
+im
+θ
+im
+k
+, π
+im
+θ
+im
+
+by replacing it with the expected KL-divergence constraint
+Es∼ρπθk
+h
+DKL
+π
+im
+θ
+im
+k
+(·|s), π
+im
+θim (·|s)
+
+i
+≤ δ where δ is a threshold hyperparameter, and the expectation
+can be easily approximated by stochastic sampling. With the above amendment, we propose practical HATRPO algorithm in which, at every iteration k + 1, given a permutation of agents i1:n, agent
+im∈{1,...,n} sequentially optimises its policy parameter θ
+im
+k+1 by maximising a constrained objective:
+θ
+im
+k+1 = arg max
+θim
+E
+s∼ρπθk
+,a
+i1:m−1 ∼π
+i1:m−1
+θ
+i1:m−1
+k+1
+,a
+im∼π
+im
+θim
+
+A
+im
+πθk
+(s, a
+i1:m−1
+, a
+im)
+
+,
+subject to Es∼ρπθk
+
+DKL
+π
+im
+θ
+im
+k
+(·|s), π
+im
+θim (·|s)
+ ≤ δ. (7)
+To compute the above equation, similar to TRPO, one can apply a linear approximation to the
+objective function and a quadratic approximation to the KL constraint; the optimisation problem in
+Equation (7) can be solved by a closed-form update rule as
+θ
+im
+k+1 = θ
+im
+k + α
+j
+s
+2δ
+g
+im
+k
+(Him
+k
+)−1g
+im
+k
+(Him
+k
+)
+−1
+g
+im
+k
+, (8)
+where Him
+k = ∇2
+θim Es∼ρπθk
+
+DKL
+π
+im
+θ
+im
+k
+(·|s), π
+im
+θim (·|s)
+
+
+θim=θ
+im
+k
+is the Hessian of the expected KLdivergence, g
+im
+k
+is the gradient of the objective in Equation (7), α
+j < 1 is a positive coefficient that
+is found via backtracking line search, and the product of (Him
+k
+)
+−1
+g
+im
+k
+can be efficiently computed
+with conjugate gradient algorithm.
+The last missing piece for HATRPO is to estimate Ea
+i1:m−1∼π
+i1:m−1
+θk+1
+,a
+im∼π
+im
+θim
+h
+Aim
+πθk
+
+s, a
+i1:m−1
+, a
+im
+
+i
+,
+which poses new challenges because each agent’s objective has to take into account all prev
+Published as a conference paper at ICLR 2022
+agents’ updates, and the size of input vaires. Fortunately, with the following proposition, we can
+efficiently estimate this objective by employing a joint advantage estimator.
+Proposition 2. Let π =
+Qn
+j=1 π
+ij be a joint policy, and Aπ(s, a) be its joint advantage function.
+Let π¯
+i1:m−1 =
+Qm−1
+j=1 π¯
+ij be some other joint policy of agents i1:m−1, and πˆ
+im be some other policy
+of agent im. Then, for every state s,
+Ea
+i1:m−1∼π¯
+i1:m−1 ,a
+im∼πˆ
+im
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+
+= Ea∼π
+hπˆ
+im(a
+im|s)
+π
+im(a
+im|s)
+− 1
+π¯
+i1:m−1 (a
+i1:m−1
+|s)
+πi1:m−1 (a
+i1:m−1 |s)
+Aπ(s, a)
+i
+. (9)
+For proof see Appendix D.1. One benefit of applying Equation (9) is that agents only need to maintain a joint advantage estimator Aπ(s, a) rather than one centralised critic for each individual agent
+(e.g., unlike CTDE methods such as MADDPG). Another practical benefit one can draw is that,
+given an estimator Aˆ(s, a) of the advantage function Aπθk
+(s, a), for example GAE (Schulman et al.,
+2015b), we can estimate E
+a
+i1:m−1 ∼π
+i1:m−1
+θ
+i1:m−1
+k+1
+,a
+im∼π
+im
+θim
+h
+A
+imπθk
+
+s, a
+i1:m−1
+, a
+im
+
+i
+with an estimator of
+π
+im
+θ
+(a
+im|s)
+π
+im
+θk
+(a
+im|s)
+− 1
+
+Mi1:m
+
+s, a
+
+, where Mi1:m =
+π¯
+i1:m−1 (a
+i1:m−1
+|s)
+πi1:m−1 (a
+i1:m−1 |s)
+Aˆ
+
+s, a
+
+. (10)
+Notably, Equation (10) aligns nicely with the sequential update scheme in HATRPO. For agent im,
+since previous agents i1:m−1 have already made their updates, the compound policy ratio for Mi1:m
+in Equation (10) is easy to compute. Given a batch B of trajectories with length T, we can estimate
+the gradient with respect to policy parameters (derived in Appendix D.2) as follows,
+gˆ
+im
+k =
+1
+|B|
+X
+τ∈B
+XT
+t=0
+Mi1:m(st, at)∇θim log π
+im
+θim (a
+i
+t
+|st)
+
+
+θim=θ
+im
+k
+.
+The term −1 · Mi1:m(s, a) of Equation (10) is not reflected in gˆ
+im
+k
+, as it only introduces a constant
+with zero gradient. Along with the Hessian of the expected KL-divergence, i.e., Him
+k
+, we can update
+θ
+im
+k+1 by following Equation (8). The detailed pseudocode of HATRPO is listed in Appendix D.3.
+4.2 HAPPO
+To further alleviate the computation burden from Him
+k
+in HATRPO, one can follow the idea of PPO
+in Equation (4) by considering only using first order derivatives. This is achieved by making agent
+im choose a policy parameter θ
+im
+k+1 which maximises the clipping objective of
+Es∼ρπθk
+,a∼πθk
+"
+min
+π
+im
+θim (a
+i
+|s)
+π
+im
+θ
+im
+k
+(a
+i
+|s)
+Mi1:m (s, a), clip
+π
+im
+θim (a
+i
+|s)
+π
+im
+θ
+im
+k
+(a
+i
+|s)
+, 1 ± 
+
+Mi1:m (s, a)
+!#. (11)
+The optimisation process can be performed by stochastic gradient methods such as Adam (Kingma
+& Ba, 2014). We refer to the above procedure as HAPPO and Appendix D.4 for its full pseudocode.
+4.3 RELATED WORK
+We are fully aware of previous attempts that tried to extend TRPO/PPO into MARL. Despite empirical successes, none of them managed to propose a theoretically-justified trust region protocol
+in multi-agent learning, or maintain the monotonic improvement property. Instead, they tend to
+impose certain assumptions to enable direct implementations of TRPO/PPO in MARL problems.
+For example, IPPO (de Witt et al., 2020a) assume homogeneity of action spaces for all agents and
+enforce parameter sharing. Yu et al. (2021) proposed MAPPO which enhances IPPO by considering a joint critic function and finer implementation techniques for on-policy methods. Yet, it still
+suffers similar drawbacks of IPPO due to the lack of monotonic improvement guarantee especially
+when the parameter-sharing condition is switched off. Wen et al. (2021) adjusted PPO for MARL
+by considering a game-theoretical approach at the meta-game level among agents. Unfortunately, it
+can only deal with two-agent cases due to the intractability of Nash equilibrium. Recently, Li & He
+(2020) tried to implement TRPO for MARL through distributed consensus optimisation; however,
+they enforced the same ratio π¯
+i
+(a
+i
+|s)/πi
+(a
+i
+|s) for all agents (see their Equation (7)), which, simila
+Published as a conference paper at ICLR 2022
+0.0 0.5 1.0 1.5 2.0
+Environment Steps 1e7
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+Evaluate Winning Rate
+2c_vs_64zg
+(a) 2c-vs-64zg (hard)
+0.0 0.5 1.0 1.5 2.0
+Environment Steps 1e7
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+Evaluate Winning Rate
+3s5z
+(b) 3s5z (hard)
+0.0 0.5 1.0 1.5 2.0
+Environment Steps 1e7
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+Evaluate Winning Rate
+corridor
+HATRPO
+HAPPO
+MAPPO
+(c) corridor (super hard)
+Figure 2: Performance comparisons between HATRPO/HAPPO and MAPPO on three SMAC tasks.
+Since all methods achieve 100% win rate, we believe SMAC is not sufficiently difficult to discriminate the capabilities of these algorithms, especially when non-parameter sharing is not required.
+to parameter sharing, largely limits the policy space for optimisation. Moreover, their method comes
+with a δ/n KL-constraint threshold that fails to consider scenarios with large agent number.
+One of the key ideas behind our HATRPO/HAPPO is the sequential update scheme. A similar
+idea of multi-agent sequential update was also discussed in the context of dynamic programming
+(Bertsekas, 2019) where artificial “in-between” states have to be considered. On the contrary, our
+sequential update sceheme is developed based on Lemma 1, which does not require any artificial assumptions and hold for any cooperative games. Furthermore, Bertsekas (2019) requires to maintain
+a fixed order of updates that is pre-defined for the task, whereas the order in HATRPO/MAPPO can
+be randomised at each iteration, which also offers desirable convergence property, as stated in Proposition 3 and also verified through ablation studies in Appendix F. The idea of sequential update also
+appeared in principal component analysis; in EigenGame (Gemp et al., 2020) eigenvectors, represented as players, maximise their own utility functions one-by-one. Although EigenGame provably
+solves the PCA problem, it is of little use in MARL, where a single iteration of sequential updates
+is insufficient to learn complex policies. Furthermore, its design and analysis rely on closed-form
+matrix calculus, which has no extension to MARL.
+Lastly, we would like to highlight the importance of the decomposition result in Lemma 1. This
+result could serve as an effective solution to value-based methods in MARL where tremendous
+efforts have been made to decompose the joint Q-function into individual Q-functions when the
+joint Q-function are decomposable (Rashid et al., 2018). Lemma 1, in contrast, is a general result
+that holds for any cooperative MARL problems regardless of decomposibility. As such, we think of
+it as an appealing contribution to future developments on value-based MARL methods.
+5 EXPERIMENTS AND RESULTS
+We consider two most common benchmarks—StarCraftII Multi-Agent Challenge (SMAC)
+(Samvelyan et al., 2019) and Multi-Agent MuJoCo (de Witt et al., 2020b)—for evaluating MARL
+algorithms. All hyperparameter settings and implementations details can be found in Appendix E.
+StarCraftII Multi-Agent Challenge (SMAC). SMAC contains a set of StarCraft maps in which
+a team of ally units aims to defeat the opponent team. IPPO (de Witt et al., 2020a) and MAPPO
+(Yu et al., 2021) are known to achieve supreme results on this benchmark. By adopting parameter
+sharing, these methods achieve a winning rate of 100% on most maps, even including the maps that
+have heterogeneous agents. Therefore, we hypothesise that non-parameter sharing is not necessarily
+required and the trick of sharing policies is sufficient to solve SMAC tasks. We test our methods
+on two hard maps and one super-hard; results on Figure 2 confirm that SMAC is not sufficiently
+difficult to show off the capabilities of HATRPO/HAPPO when compared against existing methods.
+Multi-Agent MuJoCo. In comparison to SMAC, we believe Mujoco enviornment provides a more
+suitable testing case for our methods. MuJoCo tasks challenge a robot to learn an optimal way
+of motion; Multi-Agent MuJoCo models each part of a robot as an independent agent, for example, a leg for a spider or an arm for a swimmer. With the increasing variety of the body parts,
+modelling heterogeneous policies becomes necessary. Figure 3 demonstrate that, in all scenarios,
+HATRPO and HAPPO enjoy superior performance over those of parameter-sharing methods: IPPO
+and MAPPO, and also outperform non-parameter sharing MADDPG (Lowe et al., 2017b) both in
+terms of reward values and variance. It is also worth noting that the performance gap between HATRPO and its rivals enlarges with the increasing number of agents. Meanwhile, we can observe that
+HATRPO outperforms HAPPO in almost all tasks; we believe it is because the hard KL constraint
+8
+Published as a conference paper at ICLR 2022
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+1000
+2000
+3000
+4000
+Average Episode Reward
+Ant 2x4
+(a) 2x4-Agent Ant
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+Average Episode Reward
+Ant 4x2
+(b) 4x2-Agent Ant
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Ant 8x1
+HATRPO
+HAPPO
+MAPPO
+IPPO
+MADDPG
+(c) 8x1-Agent Ant
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+6000
+Average Episode Reward
+HalfCheetah 2x3
+(d) 2x3-Agent HalfCheetah
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+6000
+Average Episode Reward
+HalfCheetah 3x2
+(e) 3x2-Agent HalfCheetah
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+6000
+Average Episode Reward
+HalfCheetah 6x1
+HATRPO
+HAPPO
+MAPPO
+IPPO
+MADDPG
+(f) 6x1-Agent HalfCheetah
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Walker 2x3
+(g) 2x3-Agent Walker
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+Average Episode Reward
+Walker 3x2
+(h) 3x2-Agent Walker
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Walker 6x1
+HATRPO
+HAPPO
+MAPPO
+IPPO
+MADDPG
+(i) 6x1-Agent Walker
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+100
+200
+300
+400
+500
+600
+700
+800
+Average Episode Reward
+Humanoid 17x1
+(j) 17x1-Agent Humanoid
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+20
+40
+60
+80
+100
+120
+140
+160
+Average Episode Reward
+1e3
+HumanoidStandup 17x1
+(k) 17x1-Agent HumanoidStandup
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+150
+100
+50
+0
+50
+100
+150
+200
+250
+Average Episode Reward
+ManyAgentSwimmer 10x2
+(l) 10x2-Agent Swimmer
+Figure 3: Performance comparison on multiple Multi-Agent MuJoCo tasks. HAPPO and HATRPO
+consistently outperform their rivals, thus establishing a new state-of-the-art algorithm for MARL.
+The performance gap enlarges with increasing number of agents.
+in HATRPO, compared to the clipping version in HAPPO, relates more closely to Algorithm 1 that
+attains monotonic improvement guarantee.
+6 CONCLUSION
+In this paper, we successfully apply trust region learning to multi-agent settings by proposing the first
+MARL algorithm that attains theoretically-justified monotonical improvement property. The key to
+our development is the multi-agent advantage decomposition lemma that holds in general with no
+need for any assumptions on agents sharing parameters or the joint value function being decomposable. Based on this, we introduced two practical deep MARL algorithms: HATRPO and HAPPO.
+Experimental results on both discrete and continuous control tasks (i.e., SMAC and Multi-Agent
+Mujoco) confirm their state-of-the-art performance. For future work, we will consider incorporating
+the safety constraint into HATRPO/HAPPO and propose rigorous safety-aware MARL solutions.
+
+
+Appendices
+A Preliminaries 14
+A.1 Definitions and Assumptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+A.2 Proofs of Preliminary Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+B Proof of Proposition 1 16
+C Derivation and Analysis of Algorithm 1 17
+C.1 Recap of Existing Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+C.2 Analysis of Training of Algorithm 1 . . . . . . . . . . . . . . . . . . . . . . . . . 17
+C.3 Analysis of Convergence of Algorithm 1 . . . . . . . . . . . . . . . . . . . . . . . 19
+D HATRPO and HAPPO 22
+D.1 Proof of Proposition 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+D.2 Derivation of the gradient estimator for HATRPO . . . . . . . . . . . . . . . . . . 22
+D.3 Pseudocode of HATRPO . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+D.4 Pseudocode of HAPPO . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+E Hyper-parameter Settings for Experiments 24
+F Ablation Experiments 26
+G Ablation Study on Non-Parameter Sharing MAPPO/IPPO 26
+H Multi-Agent Particle Environment Experiments 27
+13
+Published as a conference paper at ICLR 2022
+A PRELIMINARIES
+A.1 DEFINITIONS AND ASSUMPTIONS
+Assumption 1. There exists η ∈ R, such that 0 < η  1, and for every agent i ∈ N , the policy
+space Πi
+is η-soft; that means that for every π
+i ∈ Πi
+, s ∈ S, and a
+i ∈ Ai
+, we have π
+i
+(a
+i
+|s) ≥ η.
+Definition 3. In a fully-cooperative game, a joint policy π∗ = (π
+1
+∗
+, . . . , πn
+∗
+) is a Nash equilibrium
+(NE) if for every i ∈ N , π
+i ∈ Πi
+implies J (π∗) ≥ J
+
+π
+i
+,π
+−i
+∗
+
+.
+Definition 4. Let X be a finite set and p : X → R, q : X → R be two maps. Then, the notion of
+distance between p and q that we adopt is given by ||p − q|| , maxx∈X |p(x) − q(x)|.
+A.2 PROOFS OF PRELIMINARY RESULTS
+Lemma 3. Every agent i’s policy space Πi
+is convex and compact under the maximum norm.
+Proof. We start from proving convexity od the policy space: we prove that, for any two policies
+π
+i
+, π¯
+i ∈ Πi
+, for every α ∈ [0, 1], απi + (1 − α)¯π
+i ∈ Πi
+. Clearly, for all s ∈ S and a
+i ∈ Ai
+, we
+have
+απ
+i
+(a
+i
+|s) + (1 − α)¯π
+i
+(a
+i
+|s) ≥ αη + (1 − α)η = η.
+Also, for every state s,
+X
+ai
+h
+απ
+i
+(a
+i
+|s) + (1 − α)¯π
+i
+(a
+i
+|s)
+i
+= α
+X
+ai
+π
+i
+(a
+i
+|s) + (1 − α)
+X
+ai
+π¯
+i
+(a
+i
+|s) = α + 1 − α = 1,
+which establishes convexity.
+For compactness, we first prove that Πi
+is closed.
+Let
+π
+i
+k
+∞
+k=0 be a convergent sequence of policies of agent i. Let π
+i be the limit. We will prove that
+π
+i
+is a policy. First, by Assumption 1, for any k ∈ N, s ∈ S, and a
+i ∈ Ai
+, we have π
+i
+k
+
+a
+i
+|s
+
+≥ η.
+Hence,
+π
+i
+
+a
+i
+|s
+
+= lim
+k→∞
+π
+i
+k
+
+a
+i
+|s
+
+≥ lim
+k→∞
+η ≥ η.
+Furtheremore, for any k and s, we have P
+ai π
+i
+k
+
+a
+i
+|s
+
+= 1. Hence
+X
+ai
+π
+i
+
+a
+i
+|s
+
+=
+X
+ai
+lim
+k→∞
+π
+i
+
+a
+i
+|s
+
+= lim
+k→∞
+X
+ai
+π
+i
+
+a
+i
+|s
+
+= lim
+k→∞
+1 = 1.
+With these two conditions satisfied, π
+i
+is a policy, which proves the closure.
+Further, for all policies π
+i
+, states s and actions a, |π
+i
+(a
+i
+|s)| ≤ 1. This means that ||π
+i
+||max ≤ 1,
+which proves boundedness. Hence, Πi
+is compact.
+Lemma 4 (Continuity of ρπ). The improper state distribution ρπ is continuous in π.
+Proof. First, let us show that for any t ∈ N, the distribution ρ
+t
+π
+is continous in π. We will do it
+by induction. This obviously holds when t = 0, as ρ
+0 does not depend on policy. Hence, we can
+assume that for some t ∈ N, the distribution ρ
+t
+π
+is continuous in π. Let us now consider two policies
+π and πˆ. Let s
+0 ∈ S. We have
+
+ρ
+t+1
+π (s
+0
+) − ρ
+t+1
+πˆ
+(s
+0
+)
+
+ =
+
+
+
+
+
+X
+s
+ρ
+t
+π(s)
+X
+a
+π(a|s)P(s
+0
+|s, a) −
+X
+s
+ρ
+t
+πˆ (s)
+X
+a
+πˆ(a|s)P(s
+0
+|s, a)
+
+
+
+
+
+=
+
+
+
+
+
+X
+s
+X
+a
+
+ρ
+t
+π(s)π(a|s) − ρ
+t
+πˆ (s)ˆπ(a|s)
+
+P(s
+0
+|s, a)
+
+
+
+
+
+≤
+X
+s
+X
+a
+
+ρ
+t
+π(s)π(a|s) − ρ
+t
+πˆ (s)ˆπ(a|s)
+
+ P(s
+0
+|
+Published as a conference paper at ICLR 2022
+=
+X
+s
+X
+a
+
+ρ
+t
+π(s)π(a|s) − ρ
+t
+π(s)ˆπ(a|s) + ρ
+t
+π(s)ˆπ(a|s) − ρ
+t
+πˆ (s)ˆπ(a|s)
+
+ P(s
+0
+|s, a)
+≤
+X
+s
+X
+a
+
+ρ
+t
+π(s)|π(a|s) − πˆ(a|s)| + ˆπ(a|s)
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+
+
+≤
+X
+s
+X
+a
+
+ρ
+t
+π(s)||π − πˆ|| + ˆπ(a|s)||ρ
+t
+π − ρ
+t
+πˆ ||
+=
+X
+s
+ρ
+t
+π(s)
+X
+a
+||π − πˆ|| +
+X
+s
+||ρ
+t
+π − ρ
+t
+πˆ ||X
+a
+πˆ(a|s)
+= |A| · ||π − πˆ|| + |S| · ||ρ
+t
+π − ρ
+t
+πˆ ||.
+Hence, we obtain
+||ρ
+t+1
+π − ρ
+t+1
+πˆ
+|| ≤ |A| · ||π − π¯|| + |S| · ||ρ
+t
+π − ρ
+t
+πˆ
+||. (12)
+Using the base case, taking the limit as π¯ → π, we get that the right-hand-side of Equation (12)
+converges to 0, which proves that every ρ
+t+1
+π
+is continuous in π, and finishes the inductive step.
+We can now prove that the total marginal state distribution ρπ is continous in π. To do that, let’s
+take an arbitrary  > 0, and a natural T such that T > log[
+(1−γ)
+4 ]
+log γ
+. Equivalently, we choose T such
+that 2γ
+T
+1−γ <
+
+2
+. Let π and πˆ be two policies. We have
+|ρπ(s) − ρπˆ (s)| =
+
+
+
+
+
+X∞
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+
+
+
+
+
+=
+
+
+
+
+
+TX−1
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
++ γ
+T X∞
+t=T
+γ
+t−T
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+
+
+
+
+
+≤
+TX−1
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+ + γ
+T X∞
+t=T
+γ
+t−T
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+
+≤
+TX−1
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+ + γ
+T X∞
+t=T
+2γ
+t−T
+=
+TX−1
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+ +
+2γ
+T
+1 − γ
+<
+TX−1
+t=0
+γ
+t
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+ +
+
+2
+≤
+TX−1
+t=0
+
+ρ
+t
+π(s) − ρ
+t
+πˆ (s)
+
+ +
+
+2
+≤
+TX−1
+t=0
+||ρ
+t
+π − ρ
+t
+πˆ || +
+
+2
+. (13)
+Now, by continuity of each of ρ
+t
+π
+, for t = 0, 1, . . . , T −1, we have that there exists a δ > 0 such that
+||π − πˆ|| < δ implies ||ρ
+t
+π − ρ
+t
+πˆ
+|| <
+
+2T
+. Taking such δ, by Equation (13), we get ||ρπ − ρπˆ|| ≤ ,
+which finishes the proof.
+Lemma 5 (Continuity of Qπ). Let π be a policy. Then Qπ(s, a) is Lipschitz-continuous in π.
+Proof. Let π and πˆ be two policies. Then we have
+|Qπ(s, a) − Qπˆ(s, a)|
+=
+
+
+
+
+
+
+r(s, a) + γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)π(a|s)Qπ(s, a)
+!
+−
+
+r(s, a) + γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)ˆπ(a|s)Qπˆ(s, a)
+!
+
+
+
+
+= γ
+
+
+
+
+
+X
+s
+0
+X
+a
+P(s
+0
+|s, a) [π(a|s)Qπ(s, a) − πˆ(a|s)Qπˆ(s, a)]
+
+
+
+
+
+≤ γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)|π(a|s)Qπ(s, a) − πˆ(a|s)Qπˆ(s, a)|
+= γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)|π(a|s)Qπ(s, a) − πˆ(a|s)Qπ(s, a) + ˆπ(a|s)Qπ(s, a) − πˆ(a|s)Qπˆ(s, a)|
+≤ γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a) (|π(a|s)Qπ(s, a) − πˆ(a|s)Qπ(s, a)| + |πˆ(a|s)Qπ(s, a) − πˆ(a|s)Qπˆ(s, a)|
+Published as a conference paper at ICLR 2022
+= γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)|π(a|s) − πˆ(a|s)| · |Qπ(s, a)|
++ γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)ˆπ(a|s)|Qπ(s, a) − Qπˆ(s, a)|
+≤ γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)||π − πˆ|| · Qmax
++ γ
+X
+s
+0
+X
+a
+P(s
+0
+|s, a)ˆπ(a|s)||Qπ − Qπˆ||
+= γ Qmax · |A| · ||π − πˆ|| + γ||Qπ − Qπˆ||
+Hence, we get
+||Qπ − Qπˆ|| ≤ γ Qmax · |A| · ||π − πˆ|| + γ||Qπ − Qπˆ||,
+which implies
+||Qπ − Qπˆ|| ≤ γ Qmax · |A| · ||π − πˆ||
+1 − γ
+. (14)
+Equation (14) establishes Lipschitz-continuity with a constant γ Qmax·|A|
+1−γ
+.
+Corollary 1. From Lemma 5 we obtain that the following functions are Lipschitz-continuous in π:
+the state value function Vπ =
+P
+a
+π(a|s)Qπ(s, a),
+the advantage function Aπ(s, a) = Qπ(s, a) − Vπ(s),
+and the expected total reward J(π) = Es∼ρ0 [Vπ(s)].
+Lemma 6. Let π and πˆ be policies. The quantity Es∼ρπ,a∼πˆ [Aπ(s, a)] is continuous in π.
+Proof. We have
+Es∼ρπ,a∼πˆ [Aπ(s, a)] = X
+s
+X
+a
+ρπ(s)ˆπ(a|s)Aπ(s, a).
+Continuity follows from continuity of each ρπ(s) (Lemma 4) and Aπ(s, a) (Corollary 1).
+Corollary 2 (Continuity in MARL). All the results about continuity in π extend to MARL. Policy π
+can be replaced with joint policy π; as π is Lipschitz-continuous in agent i’s policy π
+i
+, the above
+continuity results extend to conitnuity in π
+i
+. Thus, we will quote them in our proofs for MARL.
+B PROOF OF PROPOSITION 1
+Proposition 1. Let’s consider a fully-cooperative game with an even number of agents n, one state,
+and the joint action space {0, 1}
+n, where the reward is given by r(0
+n/2
+, 1
+n/2
+) = r(1
+n/2
+, 0
+n/2
+) = 1,
+and r(a
+1:n) = 0 for all other joint actions. Let J
+∗ be the optimal joint reward, and J
+∗
+share be the
+optimal joint reward under the shared policy constraint. Then
+J
+∗
+share
+J
+∗ =
+2
+2
+n
+.
+Proof. Clearly J
+∗ = 1. An optimal joint policy in this case is, for example, the deterministic policy
+with joint action (0
+n/2
+, 1
+n/2
+).
+Now, let the shared policy be (θ, 1−θ), where θ determines the probability that an agent takes action
+0. Then, the expected reward is
+J(θ) = Pr 
+a
+1:n = (0
+n/2
+, 1
+n/2
+)
+
+· 1 + Pr 
+a
+1:n = (1
+n/2
+, 0
+n/2
+)
+
+· 1 = 2 · θ
+n/2
+(1 − θ)
+n/2
+.
+16
+Published as a conference paper at ICLR 2022
+In order to maximise J(θ), we must maximise θ(1 − θ), or equivalently, p
+θ(1 − θ). By the
+artithmetic-geometric means inequality, we have
+p
+θ(1 − θ) ≤
+θ + (1 − θ)
+2
+=
+1
+2
+,
+where the equality holds if and only if θ = 1 − θ, that is θ =
+1
+2
+. In such case we have
+J
+∗
+share = J
+
+1
+2
+
+= 2 · 2
+−n/2
+· 2
+−n/2 =
+2
+2
+n
+,
+which finishes the proof.
+C DERIVATION AND ANALYSIS OF ALGORITHM 1
+C.1 RECAP OF EXISTING RESULTS
+Lemma 7 (Performance Difference). Let π¯ and π be two policies. Then, the following identity
+holds,
+J(¯π) − J(π) = Es∼ρπ¯ ,a∼π¯ [Aπ(s, a)] .
+Proof. See Kakade & Langford (2002) (Lemma 6.1) or Schulman et al. (2015a) (Appendix A).
+Theorem 1. (Schulman et al., 2015a, Theorem 1) Let π be the current policy and π¯ be
+the next candidate policy. We define Lπ(¯π) = J(π) + Es∼ρπ,a∼π¯ [Aπ(s, a)] , D
+max
+KL (π, π¯) =
+maxs DKL (π(·|s), π¯(·|s)). Then the inequality of
+J(¯π) ≥ Lπ(¯π) − CD
+max
+KL
+π, π¯
+
+(2)
+holds, where C =
+4γ maxs,a |Aπ(s,a)|
+(1−γ)
+2 .
+Proof. See Schulman et al. (2015a) (Appendix A and Equation (9) of the paper).
+C.2 ANALYSIS OF TRAINING OF ALGORITHM 1
+Lemma 1 (Multi-Agent Advantage Decomposition). In any cooperative Markov games, given a
+joint policy π, for any state s, and any agent subset i1:m, the below equations holds.
+A
+i1:m
+π
+
+s, a
+i1:m
+
+=
+Xm
+j=1
+A
+ij
+π
+
+s, a
+i1:j−1
+, aij
+
+.
+Proof. By the definition of multi-agent advantage function,
+A
+i1:m
+πθ
+(s, a
+i1:m) = Q
+i1:m
+πθ
+(s, a
+i1:m) − Vπθ
+(s)
+=
+Xm
+k=1
+h
+Q
+i1:k
+πθ
+(s, a
+i1:k
+) − Q
+i1:k−1
+πθ
+(s, a
+i1:k−1
+)
+i
+=
+Xm
+k=1
+A
+ik
+πθ
+(s, a
+i1:k−1
+, aik
+),
+which finishes the proof.
+Note that a similar finding has been shown in Kuba et al. (2021).
+Lemma 8. Let π =
+Qn
+i=1 π
+i and π¯ =
+Qn
+i=1 π¯
+i be joint policies. Then
+D
+max
+KL (π,π¯) ≤
+Xn
+i=1
+D
+max
+KL
+π
+i
+, π¯
+i
+
+Published as a conference paper at ICLR 2022
+Proof. For any state s, we have
+DKL (π(·|s),π¯(·|s)) = Ea∼π [log π(a|s) − log π¯(a|s)]
+= Ea∼π
+"
+log Yn
+i=1
+π
+i
+(a
+i
+|s)
+!
+− log Yn
+i=1
+π¯
+i
+(a
+i
+|s)
+!#
+= Ea∼π
+"Xn
+i=1
+log π
+i
+(a
+i
+|s) −
+Xn
+i=1
+log ¯π
+i
+(a
+i
+|s)
+#
+=
+Xn
+i=1
+Ea
+i∼πi
+,a−i∼π−i
+
+log π
+i
+(a
+i
+|s) − log ¯π
+i
+(a
+i
+|s)
+
+=
+Xn
+i=1
+DKL
+π
+i
+(·|s), π¯
+i
+(·|s)
+
+.
+Now, taking maximum over s on both sides yields
+D
+max
+KL (π,π¯) ≤
+Xn
+i=1
+D
+max
+KL
+π
+i
+, π¯
+i
+
+,
+as required.
+Lemma 2. Let π be a joint policy. Then, for any joint policy π¯, we have
+J(π¯) ≥ J(π) + Xn
+m=1
+
+L
+i1:m
+π
+
+π¯
+i1:m−1
+, π¯
+im
+
+− CD
+max
+KL (π
+im, π¯
+im)
+
+.
+Proof. By Theorem 1
+J(π¯) ≥ Lπ(π¯) − CD
+max
+KL (π,π¯)
+= J(π) + Es∼ρπ,a∼π¯ [Aπ(s, a)] − CD
+max
+KL (π,π¯)
+which by Lemma 1 equals
+= J(π) + Es∼ρπ,a∼π¯
+"Xn
+m=1
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+
+#
+− CD
+max
+KL (π,π¯)
+and by Lemma 8 this is at least
+≥ J(π) + Es∼ρπ,a∼π¯
+"Xn
+m=1
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+
+#
+−
+Xn
+m=1
+CD
+max
+KL (π
+im, π¯
+im)
+= J(π) + Xn
+m=1
+Es∼ρπ,a
+i1:m−1∼π¯
+i1:m−1 ,a
+im∼π¯
+im
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+ −
+Xn
+m=1
+CD
+max
+KL (π
+im, π¯
+im)
+= J(π) + Xn
+m=1
+
+L
+i1:m
+π
+
+π¯
+i1:m−1
+, π¯
+im
+
+− CD
+max
+KL (π
+im, π¯
+im)
+
+.
+Theorem 2. A sequence (πk)
+∞
+k=0 of joint policies updated by Algorithm 1 has the monotonic improvement property, i.e., J(πk+1) ≥ J(πk) for all k ∈ N.
+Proof. Let π0 be any joint policy. For every k ≥ 0, the joint policy πk+1 is obtained from πk by
+Algorithm 1 update; for m = 1, . . . , n,
+π
+im
+k+1 = arg max
+πim
+h
+L
+i1:m
+πk
+
+π
+i1:m−1
+k+1 , πim
+
+− CD
+max
+KL
+π
+im
+k
+, πim
+
+
+Published as a conference paper at ICLR 2022
+By Theorem 1, we have
+J(πk+1) ≥ Lπk
+(πk+1) − CD
+max
+KL (πk,πk+1),
+which by Lemma 8 is lower-bounded by
+≥ Lπk
+(πk+1) −
+Xn
+m=1
+CD
+max
+KL (π
+im
+k
+, π
+im
+k+1)
+= J(πk) + Xn
+m=1
+
+L
+i1:m
+πk
+(π
+i1:m−1
+k+1 , π
+im
+k+1) − CD
+max
+KL (π
+im
+k
+, π
+im
+k+1)
+
+, (15)
+and as for every m, π
+im
+k+1 is the argmax, this is lower-bounded by
+≥ J(πk) + Xn
+m=1
+
+L
+i1:m
+πk
+(π
+i1:m−1
+k+1 , π
+im
+k
+) − CD
+max
+KL (π
+im
+k
+, π
+im
+k
+)
+
+,
+which, as mentioned in Definition 2, equals
+= J(πk) + Xn
+m=1
+0 = J(πk),
+where the last inequality follows from Equation (6). This proves that Algorithm 1 achieves monotonic improvement.
+C.3 ANALYSIS OF CONVERGENCE OF ALGORITHM 1
+Theorem 3. Supposing in Algorithm 1 any permutation of agents has a fixed non-zero probability to
+begin the update, a sequence (πk)
+∞
+k=0 of joint policies generated by the algorithm, in a cooperative
+Markov game, has a non-empty set of limit points, each of which is a Nash equilibrium.
+Proof. Step 1 (convergence). Firstly, it is clear that the sequence (J(πk))∞
+k=0 converges as, by
+Theorem 2, it is non-decreasing and bounded above by Rmax
+1−γ
+. Let us denote the limit by J¯. For every
+k, we denote the tuple of agents, according to whose order the agents perform the sequential updates,
+by i
+k
+1:n
+, and we note that
+i
+k
+1:n
+
+k∈N
+is a random process. Furthermore, we know that the sequence
+of policies (πk) is bounded, so by Bolzano-Weierstrass Theorem, it has at least one convergent
+subsequence. Let π¯ be any limit point of the sequence (note that the set of limit points is a random
+set), and
+πkj
+∞
+j=0 be a subsequence converging to π¯ (which is a random subsequence as well). By
+continuity of J in π (Corollary 1), we have
+J(π¯) = J
+
+lim
+j→∞
+πkj
+
+= lim
+j→∞
+J
+
+πkj
+
+= J. ¯ (16)
+For now, we introduce an auxiliary definition.
+Definition 5 (TR-Stationarity). A joint policy π¯ is trust-region-stationary (TR-stationary) if, for
+every agent i,
+π¯
+i = arg max
+πi
+
+Es∼ρπ¯ ,a
+i∼πi
+
+A
+i
+π¯
+(s, a
+i
+)
+
+− Cπ¯D
+max
+KL
+π¯
+i
+, πi
+ ,
+where Cπ¯ =
+4γ
+(1−γ)
+2 , and  = maxs,a |Aπ¯(s, a)|.
+We will now establish the TR-stationarity of any limit point joint policy π¯ (which, as stated above,
+is a random variable). Let Ei
+0:∞1:n
+[·] denote the expected value operator under the random process
+(i
+0:∞
+1:n
+). Let also k = maxs,a |Aπk
+(s, a)|, and Ck =
+4γk
+(1−γ)
+2 . We have
+0 = lim
+k→∞
+Ei
+0:∞1:n
+[J(πk+1) − J(πk)]
+≥ lim
+k→∞
+Ei
+0:∞1:n
+[Lπk
+(πk+1) − CkD
+max
+KL (πk,πk+1)] by Theorem 1
+≥ lim
+k→∞
+Ei
+0:∞1:n
+h
+L
+i
+k
+1
+πk
+
+π
+i
+k
+1
+k+1
+− CkD
+max
+KL 
+π
+i
+k
+1
+k
+, π
+i
+k
+1
+k+1i
+by Equation (15) and the fact that each of its summands is non-negative
+Published as a conference paper at ICLR 2022
+Now, we consider an arbitrary limit point π¯ from the (random) limit set, and a (random) subsequence
+
+πkj
+∞
+j=0 that converges to π¯. We get
+0 ≥ lim
+j→∞
+Ei
+0:∞1:n
+
+L
+i
+kj
+1
+πkj
+
+π
+i
+kj
+1
+kj+1
+− CkjD
+max
+KL 
+π
+i
+kj
+1
+kj
+, π
+i
+kj
+1
+kj+1 .
+As the expectation is taken of non-negative random variables, and for every i ∈ N and k ∈ N, with
+some positive probability pi
+, we have i
+kj
+1 = i (because every permutation has non-zero probability),
+the above is bounded from below by
+pi
+lim
+j→∞
+max
+πi
+h
+L
+i
+πkj
+(π
+i
+) − CkjD
+max
+KL 
+π
+i
+kj
+, πi
+i ,
+which, as πkj
+converges to π¯, equals to
+pi max
+πi
+
+L
+i
+π¯
+(π
+i
+) − Cπ¯D
+max
+KL
+π¯
+i
+, πi
+ ≥ 0, by Equation (6).
+For convergence of L
+i
+πkj
+(π
+i
+) we used Definition 2 combined with Lemma 6, for convergence
+of Ckj we used Corollary 1, and the convergence of Dmax
+KL follows from continuity of DKL and
+max. This proves that, for any limit point π¯ of the random process (πk) induced by Algorithm 1,
+maxπi
+
+L
+i
+π¯
+(π
+i
+) − Cπ¯D
+max
+KL
+π¯
+i
+, πi
+ = 0, which is equivalent with Definition 5.
+Step 2 (dropping the penalty term). Now, we have to prove that TR-stationary points are NEs of
+cooperative Markov games. The main step is to prove the following statement: a TR-stationary joint
+policy π¯, for every state s ∈ S, satisfies
+π¯
+i = arg max
+πi
+Ea
+i∼πi
+
+A
+i
+π¯
+(s, a
+i
+)
+
+. (17)
+We will use the technique of the proof by contradiction. Suppose that there is a state s0 such that
+there exists a policy πˆ
+i with
+Ea
+i∼πˆ
+i
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+> Ea
+i∼π¯
+i
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+. (18)
+Let us parametrise the policies π
+i
+according to the template
+π
+i
+(·|s0) =
+x
+i
+1
+, . . . , xi
+di−1
+, 1 −
+d
+Xi−1
+j=1
+x
+i
+j
+
+where the values of x
+i
+j
+(j = 1, . . . , di − 1) are such that π
+i
+(·|s0) is a valid probability distribution.
+Then we can rewrite our quantity of interest (the objective of Equation (17) as
+Ea
+i∼πi
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+=
+d
+Xi−1
+j=1
+x
+i
+j
+· A
+i
+π¯
+
+s0, ai
+j
+
++ (1 −
+d
+Xi−1
+h=1
+x
+i
+h
+)A
+i
+π¯
+
+s0, ai
+di
+
+=
+d
+Xi−1
+j=1
+x
+i
+j
+
+A
+i
+π¯
+
+s0, ai
+j
+
+− A
+i
+π¯
+
+s0, ai
+di
+ + A
+i
+π¯
+
+s0, ai
+di
+
+,
+which is an affine function of the policy parameterisation. It follows that its gradient (with respect to
+x
+i
+) and directional derivatives are constant in the space of policies at state s0. The existance of policy
+πˆ
+i
+(·|s0), for which Inequality (18) holds, implies that the directional derivative in the direction from
+π¯
+i
+(·|s0) to πˆ
+i
+(·|s0) is strictly positive. We also have
+∂DKL(¯π
+i
+(·|s0), πi
+(·|s0))
+∂xi
+j
+=
+∂
+∂xi
+j
+
+(¯π
+i
+(·|s0))T
+(log ¯π
+i
+(·|s0) − log π
+i
+(·|s0))
+=
+∂
+∂xi
+j
+
+−(¯π
+i
+)
+T
+log π
+i
+
+(omitting state s0 for brevity)
+= −
+∂
+∂xi
+j
+d
+Xi−1
+k=1
+π¯
+i
+k
+log x
+i
+k −
+∂
+∂xi
+j
+π¯
+i
+di
+log
+1 −
+d
+Xi−1
+k=1
+x
+i
+k
+!
+= −
+π¯
+i
+j
+x
+i
+j
++
+π¯
+i
+di
+1 −
+Pdi−1
+k=1 x
+i
+k
+= −
+π¯
+i
+j
+π
+i
+j
++
+π¯
+i
+di
+π
+i
+di
+= 0, when evaluated at π
+i = ¯π
+i
+,
+Published as a conference paper at ICLR 2022
+which means that the KL-penalty has zero gradient at π¯
+i
+(·|s0). Hence, when evaluated at π
+i
+(·|s0) =
+π¯
+i
+(·|s0), the objective
+ρπ¯(s0)Ea
+i∼πi
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+− Cπ¯DKL
+π¯
+i
+(·|s0), πi
+(·|s0)
+
+has a strictly positive directional derivative in the direction of πˆ
+i
+(·|s0). Thus, there exists a policy
+πe
+i
+(·|s0), sufficiently close to π¯
+i
+(·|s0) on the path joining it with πˆ
+i
+(·|s0), for which
+ρπ¯(s0)Ea
+i∼πei
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+− Cπ¯DKL
+π¯
+i
+(·|s0), πe
+i
+(·|s0)
+
+> 0.
+Let π
+i
+∗ be a policy such that π
+i
+∗
+(·|s0) = πe
+i
+(·|s0), and π
+i
+∗
+(·|s) = ¯π
+i
+(·|s) for states s 6= s0. As for
+these states we have
+ρπ¯(s)Ea
+i∼πi
+∗
+
+A
+i
+π¯
+(s, a
+i
+)
+
+= ρπ¯(s)Ea
+i∼π¯
+i
+
+A
+i
+π¯
+(s, a
+i
+)
+
+= 0, and DKL(¯π
+i
+(·|s), πi
+∗
+(·|s)) = 0,
+it follows that
+L
+i
+π¯
+(π
+i
+∗
+) − Cπ¯D
+max
+KL (¯π
+i
+, πi
+∗
+) = ρπ¯(s0)Ea
+i∼πei
+
+A
+i
+π¯
+(s0, a
+i
+)
+
+− Cπ¯DKL
+π¯
+i
+(·|s0), πe
+i
+(·|s0)
+
+> 0 = L
+i
+π¯
+(¯π
+i
+) − Cπ¯D
+max
+KL (¯π
+i
+, π¯
+i
+),
+which is a contradiction with TR-stationarity of π¯. Hence, the claim of Equation (17) is proved.
+Step 3 (optimality). Now, for a fixed joint policy π¯
+−i of other agents, π¯
+i
+satisfies
+π¯
+i = arg max
+πi
+Ea
+i∼πi
+
+A
+i
+π¯
+(s, a
+i
+)
+
+= arg max
+πi
+Ea
+i∼πi
+
+Q
+i
+π¯
+(s, a
+i
+)
+
+, ∀s ∈ S,
+which is the Bellman optimality equation (Sutton & Barto, 2018). Hence, for a fixed joint policy
+π¯
+−i
+, the policy π¯
+i
+is optimal:
+π¯
+i = arg max
+πi
+J(π
+i
+,π¯
+−i
+).
+As agent i was chosen arbitrarily, π¯ is a Nash equilibrium.
+
+Published as a conference paper at ICLR 2022
+D HATRPO AND HAPPO
+D.1 PROOF OF PROPOSITION 2
+Proposition 2. Let π =
+Qn
+j=1 π
+ij be a joint policy, and Aπ(s, a) be its joint advantage function.
+Let π¯
+i1:m−1 =
+Qm−1
+j=1 π¯
+ij be some other joint policy of agents i1:m−1, and πˆ
+im be some other policy
+of agent im. Then, for every state s,
+Ea
+i1:m−1∼π¯
+i1:m−1 ,a
+im∼πˆ
+im
+
+A
+im
+π
+
+s, a
+i1:m−1
+, a
+im
+
+= Ea∼π
+hπˆ
+im(a
+im|s)
+π
+im(a
+im|s)
+− 1
+π¯
+i1:m−1 (a
+i1:m−1
+|s)
+πi1:m−1 (a
+i1:m−1 |s)
+Aπ(s, a)
+i
+. (9)
+Proof. We have
+= Ea∼π
+
+π¯
+i1:m(a
+i1:m|s)
+πi1:m(a
+i1:m|s)
+Aπ(s, a) −
+π¯
+i1:m−1 (a
+i1:m−1
+|s)
+πi1:m−1 (a
+i1:m−1 |s)
+Aπ(s, a)
+
+= Ea
+i1:m∼πi1:m,a−i1:m∼π−i1:m
+
+π¯
+i1:m(a
+i1:m|s)
+πi1:m(a
+i1:m|s)
+Aπ(s, a
+i1:m, a
+−i1:m)
+
+− Ea
+i1:m−1∼π
+i1:m−1 ,a
+−i1:m−1∼π
+−i1:m−1
+
+π¯
+i1:m−1 (a
+i1:m−1
+|s)
+πi1:m−1 (a
+i1:m−1 |s)
+Aπ(s, a
+i1:m−1
+, a
+−i1:m−1
+)
+
+= Ea
+i1:m∼π¯i1:m,a−i1:m∼π−i1:m
+
+Aπ(s, a
+i1:m, a
+−i1:m)
+
+− Ea
+i1:m−1∼π¯
+i1:m−1 ,a
+−i1:m−1∼π
+−i1:m−1
+
+Aπ(s, a
+i1:m−1
+, a
+−i1:m−1
+)
+
+= Ea
+i1:m∼π¯i1:m
+
+Ea−i1:m∼π−i1:m
+
+Aπ(s, a
+i1:m, a
+−i1:m)
+
+− Ea
+i1:m−1∼π¯
+i1:m−1
+
+Ea
+−i1:m−1∼π
+−i1:m−1
+
+Aπ(s, a
+i1:m−1
+, a
+−i1:m−1
+)
+
+= Ea
+i1:m∼π¯i1:m
+
+A
+i1:m
+π (s, a
+i1:m)
+
+− Ea
+i1:m−1∼π¯
+i1:m−1
+
+A
+i1:m−1
+π (s, a
+i1:m−1
+)
+
+,
+which, by Lemma 1, equals
+= Ea
+i1:m∼π¯i1:m
+
+A
+i1:m
+π (s, a
+i1:m) − A
+i1:m−1
+π (s, a
+i1:m−1
+)
+
+= Ea
+i1:m∼π¯i1:m
+
+A
+im
+π (s, a
+i1:m−1
+, a
+im)
+
+.
+D.2 DERIVATION OF THE GRADIENT ESTIMATOR FOR HATRPO
+∇θ
+im Es∼ρπθk
+,a∼πθk
+" π
+im
+θ
+im (a
+im|s)
+π
+im
+θ
+im
+k
+(a
+im|s)
+− 1
+!
+Mi1:m(s, a)
+#
+= ∇θ
+im Es∼ρπθk
+,a∼πθk
+"
+π
+im
+θ
+im (a
+im|s)
+π
+im
+θ
+im
+k
+(a
+im|s)
+Mi1:m(s, a)
+#
+− ∇θ
+im Es∼ρπθk
+,a∼πθk
+"
+Mi1:m(s, a)
+#
+= Es∼ρπθk
+,a∼πθk
+"
+∇θ
+im π
+im
+θ
+im (a
+im|s)
+π
+im
+θ
+im
+k
+(a
+im|s)
+Mi1:m(s, a)
+#
+= Es∼ρπθk
+,a∼πθk
+"
+π
+im
+θ
+im (a
+im|s)
+π
+im
+θ
+im
+k
+(a
+im|s)
+∇θ
+im log π
+im
+θ
+im (a
+im|s)Mi1:m(s, a)
+#
+.
+Evaluated at θ
+im = θ
+im
+k
+, the above expression equals
+Es∼ρπθk
+,a∼πθk
+h
+Mi1:m(s, a)∇θ
+im log π
+im
+θ
+im (a
+im|s)
+
+
+θ
+im=θ
+im
+k
+i
+,
+which finishes the derivation.
+2
+Published as a conference paper at ICLR 2022
+D.3 PSEUDOCODE OF HATRPO
+Algorithm 2 HATRPO
+1: Input: Stepsize α, batch size B, number of: agents n, episodes K, steps per episode T, possible
+steps in line search L, line search acceptance threshold κ.
+2: Initialize: Actor networks {θ
+i
+0
+, ∀i ∈ N }, Global V-value network {φ0}, Replay buffer B
+3: for k = 0, 1, . . . , K − 1 do
+4: Collect a set of trajectories by running the joint policy πθk = (π
+1
+θ
+1
+k
+, . . . , πn
+θ
+n
+k
+).
+5: Push transitions {(o
+i
+t
+, ai
+t
+, oi
+t+1, rt), ∀i ∈ N , t ∈ T} into B.
+6: Sample a random minibatch of B transitions from B.
+7: Compute advantage function Aˆ(s, a) based on global V-value network with GAE.
+8: Draw a random permutation of agents i1:n.
+9: Set Mi1 (s, a) = Aˆ(s, a).
+10: for agent im = i1, . . . , in do
+11: Estimate the gradient of the agent’s maximisation objective
+gˆ
+im
+k =
+1
+B
+P
+B
+b=1
+P
+T
+t=1
+∇θ
+im
+k
+log π
+im
+θ
+im
+k
+
+a
+im
+t
+| o
+im
+t
+
+Mi1:m(st, at).
+Use the conjugate gradient algorithm to compute the update direction
+x
+im
+k ≈ (Hˆ im
+k
+)
+−1g
+im
+k
+,
+where Hˆ im
+k
+is the Hessian of the average KL-divergence
+1
+BT
+P
+B
+b=1
+P
+T
+t=1
+DKL 
+π
+im
+θ
+im
+k
+(·|o
+im
+t
+), π
+im
+θ
+im (·|o
+im
+t
+)
+
+.
+12: Estimate the maximal step size allowing for meeting the KL-constraint
+βˆim
+k ≈
+s
+2δ
+(xˆ
+im
+k
+)
+THˆ im
+k xˆ
+im
+k
+.
+13: Update agent im’s policy by
+θ
+im
+k+1 = θ
+im
+k + α
+jβˆim
+k xˆ
+im
+k
+,
+where j ∈ {0, 1, . . . , L} is the smallest such j which improves the sample loss by at least
+καjβˆim
+k xˆ
+im
+k
+· gˆ
+im
+k
+, found by the backtracking line search.
+14: Compute Mi1:m+1 (s, a) =
+π
+im
+θ
+imk+1
+(a
+im|o
+im)
+π
+im
+θ
+imk
+(a
+im|o
+im) Mi1:m(st, at). //Unless m = n.
+15: end for
+16: Update V-value network by following formula:
+φk+1 = arg minφ
+1
+BT
+P
+B
+b=1
+P
+T
+t=0
+
+Vφ(st) − Rˆ
+t
+2
+17: end for
+2
+Published as a conference paper at ICLR 2022
+D.4 PSEUDOCODE OF HAPPO
+Algorithm 3 HAPPO
+1: Input: Stepsize α, batch size B, number of: agents n, episodes K, steps per episode T.
+2: Initialize: Actor networks {θ
+i
+0
+, ∀i ∈ N }, Global V-value network {φ0}, Replay buffer B
+3: for k = 0, 1, . . . , K − 1 do
+4: Collect a set of trajectories by running the joint policy πθk = (π
+1
+θ
+1
+k
+, . . . , πn
+θ
+n
+k
+).
+5: Push transitions {(o
+i
+t
+, ai
+t
+, oi
+t+1, rt), ∀i ∈ N , t ∈ T} into B.
+6: Sample a random minibatch of B transitions from B.
+7: Compute advantage function Aˆ(s, a) based on global V-value network with GAE.
+8: Draw a random permutation of agents i1:n.
+9: Set Mi1 (s, a) = Aˆ(s, a).
+10: for agent im = i1, . . . , in do
+11: Update actor i
+m with θ
+im
+k+1, the argmax of the PPO-Clip objective
+1
+BT
+P
+B
+b=1
+P
+T
+t=0
+min
+π
+im
+θim (a
+imt
+|o
+imt )
+π
+im
+θ
+imk
+(a
+imt
+|o
+imt )
+Mi1:m(st, at), clip
+π
+im
+θim (a
+imt
+|o
+imt )
+π
+im
+θ
+imk
+(a
+imt
+|o
+imt )
+, 1 ± 
+
+Mi1:m(st, at)
+!
+.
+12: Compute Mi1:m+1 (s, a) =
+π
+im
+θ
+imk+1
+(a
+im|o
+im)
+π
+im
+θ
+imk
+(a
+im|o
+im) Mi1:m(s, a). //Unless m = n.
+13: end for
+14: Update V-value network by following formula:
+φk+1 = arg minφ
+1
+BT
+P
+B
+b=1
+P
+T
+t=0
+
+Vφ(st) − Rˆ
+t
+2
+15: end for
+E HYPER-PARAMETER SETTINGS FOR EXPERIMENTS
+hyperparameters value hyperparameters value hyperparameters value
+critic lr 5e-4 optimizer Adam stacked-frames 1
+gamma 0.99 optim eps 1e-5 batch size 3200
+gain 0.01 hidden layer 1 training threads 32
+actor network mlp num mini-batch 1 rollout threads 8
+hypernet embed 64 max grad norm 10 episode length 400
+activation ReLU hidden layer dim 64 use huber loss True
+Table 1: Common hyperparameters used in the SMAC domain.
+Algorithms MAPPO HAPPO HATRPO
+actor lr 5e-4 5e-4 /
+ppo epoch 5 5 /
+kl-threshold / / 0.06
+ppo-clip 0.2 0.2 /
+accept ratio / / 0.5
+Table 2: Different hyperparameters used for MAPPO, HAPPO and HATRPO in the SMAC
+The implementation of MADDPG is adopted from the Tianshou framework (Weng et al., 2021), all
+hyperparameters left unchanged at the origin best-performing status.
+24
+Published as a conference paper at ICLR 2022
+hyperparameters value hyperparameters value hyperparameters value
+critic lr 5e-3 optimizer Adam num mini-batch 1
+gamma 0.99 optim eps 1e-5 batch size 4000
+gain 0.01 hidden layer 1 training threads 8
+std y coef 0.5 actor network mlp rollout threads 4
+std x coef 1 max grad norm 10 episode length 1000
+activation ReLU hidden layer dim 64 eval episode 32
+Table 3: Common hyperparameters used for IPPO, MAPPO, HAPPO, HATRPO in the Multi-Agent
+MuJoCo domain
+Algorithms IPPO MAPPO HAPPO HATRPO
+actor lr 5e-6 5e-6 5e-6 /
+ppo epoch 5 5 5 /
+kl-threshold / / / [1e-4,1.5e-4,7e-4,1e-3]
+ppo-clip 0.2 0.2 0.2 /
+accept ratio / / / 0.5
+Table 4: Different hyperparameters used for IPPO, MAPPO, HAPPO and HATRPO in the MultiAgent MuJoCo domain.
+hyperparameters value hyperparameters value hyperparameters value
+actor lr 1e-3 optimizer Adam buffer size 1e6
+critic lr 1e-3 exploration noise 0.1 batch size 200
+gamma 0.99 step-per-epoch 50000 training num 16
+tau 5e-2 step-per-collector 2000 test num 10
+start-timesteps 25000 update-per-step 0.05 n-step 1
+epoch 200 hidden-sizes [256,256] episode length 1000
+Table 5: Hyper-parameter used for MADDPG in the Multi-Agent MuJoCo domain
+task value task value task value
+Ant(2x4) 1e-4 Ant(4x2) 1e-4 Ant(8x1) 1e-4
+HalfCheetah(2x3) 1e-4 HalfCheetah(3x2) 1e-4 HalfCheetah(6x1) 1e-4
+Walker(2x3) 1e-3 Walker(3x2) 1e-4 Walker(6x1) 1e-4
+Humanoid(17x1) 7e-4 Humanoid-Standup(17x1) 1e-4 Swimmer(10x2) 1.5e-4
+Table 6: Parameter kl-threshold used for HATRPO in the Multi-Agent MuJoCo domain
+hyperparameters value hyperparameters value hyperparameters value
+lr 7e-4 optimizer Adam num mini-batch 1
+gamma 0.99 optim eps 1e-5 eval episode 32
+gain 0.01 hidden layer 1 training threads 1
+max grad norm 10 actor network rnn rollout threads 128
+hidden layer dim 64 activation ReLU episode length 25
+Table 7: Common hyperparameters used for MAPPO, HAPPO in the Multi-Agent Particle Environment
+25
+Published as a conference paper at ICLR 2022
+F ABLATION EXPERIMENTS
+In this section, we conduct ablation study to investigate the importance of two key novelties that our
+HATRPO introduced; they are heterogeneity of agents’ parameters and the randomisation of order
+of agents in the sequential update scheme. We compare the performance of original HATRPO with
+a version that shares parameters, and with a version where the order in sequential update scheme is
+fixed throughout training. We run the experiments on two MAMuJoCo tasks (2-agent & 6-agent).
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Walker 2x3
+(a) 2-Agent Walker
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Walker 6x1
+HATRPO (original)
+HATRPO (shared parameter)
+HATRPO (no random order)
+MAPPO
+(b) 6-Agent Walker
+Figure 4: Performance comparison between original HATRPO, and its modified versions: HATRPO
+with parameter sharing, and HATRPO without randomisation of the sequential update scheme.
+The experiments reveal that, although the modified versions of HATRPO still outperform baselines
+(represented by MAPPO), their deviation from the theory harms performance. In particular, parameter sharing introduces extra variance to training, harms the monotonic improvement property
+(Theorem 2 assumes heterogeneity), and causes HATRPO to converge to suboptimal policies. The
+suboptimality is more severe in the task with more agents, as suggested by Proposition 1. Similarly,
+fixed order in the sequential update scheme negatively affected the performance at convergence
+(especially in the task with 6 agents), as suggested by Proposition 3. We conclude that the fine performance of HATRPO relies strongly on the close connection between theory an implementation.
+The connection becomes increasingly important with the growing number of agents.
+G ABLATION STUDY ON NON-PARAMETER SHARING MAPPO/IPPO
+We verify that heterogeneous-agent trust region algorithms (represented by HATRPO) achieve superior performance to, originally homogeneous, IPPO/MAPPO algorithms with the parameter-sharing
+function switched off.
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+5000
+Average Episode Reward
+Halfcheetah 3x2
+(a) 3-Agent HalfCheetah
+0.0 0.2 0.4 0.6 0.8 1.0
+Environment steps 1e7
+0
+1000
+2000
+3000
+4000
+Average Episode Reward
+Walker 3x2
+MAPPO (No share param.)
+IPPO (No share param.)
+HATRPO
+(b) 3-Agent Walker
+Figure 5: Performance comparison between HATRPO and MAPPO/IPPO without parameter sharing. HATRPO significantly outperforms its counterparts.
+26
+Published as a conference paper at ICLR 2022
+H MULTI-AGENT PARTICLE ENVIRONMENT EXPERIMENTS
+We verify that heterogeneous-agent trust region algorithms (represented here by HAPPO) quickly
+solve cooperative MPE tasks.
+0.00 0.25 0.50 0.75 1.00 1.25 1.50 1.75 2.00
+Environment steps 1e7
+220
+200
+180
+160
+140
+120
+100
+80
+60
+Average Episode Reward
+Spread
+(a) Simple Spread
+0.0 0.5 1.0 1.5 2.0 2.5 3.0
+Environment steps 1e6
+250
+200
+150
+100
+50
+0
+Average Episode Reward
+Reference
+MAPPO
+HAPPO
+(b) Simple Reference
+Figure 6: Performance comparison between MAPPO and HAPPO on MPE.

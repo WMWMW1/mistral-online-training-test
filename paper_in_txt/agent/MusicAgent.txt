@@ -1,0 +1,457 @@
+MusicAgent: An AI Agent for Music Understanding and Generation with
+Large Language Models
+Dingyao Yu1,2
+, Kaitao Song2
+, Peiling Lu2
+, Tianyu He2
+Xu Tan2
+, Wei Ye1∗
+, Shikun Zhang1∗
+, Jiang Bian2
+Peking University1
+, Microsoft Research Asia2
+{yudingyao, wye, zhangsk}@pku.edu.cn,
+{kaitaosong, peil, tianyuhe, xuta, jiabia}@microsoft.com
+https://github.com/microsoft/muzic
+Abstract
+AI-empowered music processing is a diverse
+field that encompasses dozens of tasks, ranging
+from generation tasks (e.g., timbre synthesis)
+to comprehension tasks (e.g., music classification). For developers and amateurs, it is very
+difficult to grasp all of these task to satisfy their
+requirements in music processing, especially
+considering the huge differences in the representations of music data and the model applicability across platforms among various tasks.
+Consequently, it is necessary to build a system
+to organize and integrate these tasks, and thus
+help practitioners to automatically analyze their
+demand and call suitable tools as solutions to
+fulfill their requirements. Inspired by the recent
+success of large language models (LLMs) in
+task automation, we develop a system, named
+MusicAgent, which integrates numerous musicrelated tools and an autonomous workflow to
+address user requirements. More specifically,
+we build 1) toolset that collects tools from diverse sources, including Hugging Face, GitHub,
+and Web API, etc. 2) an autonomous workflow
+empowered by LLMs (e.g., ChatGPT) to organize these tools and automatically decompose
+user requests into multiple sub-tasks and invoke corresponding music tools. The primary
+goal of this system is to free users from the
+intricacies of AI-music tools, enabling them to
+concentrate on the creative aspect. By granting users the freedom to effortlessly combine
+tools, the system offers a seamless and enriching music experience. The code is available on
+GitHub1
+along with a brief instructional video2
+.
+1 Introduction
+AI-empowered music processing is a multifaceted
+and intricate domain, encompassing a diverse range
+*Corresponding Author: Wei Ye, wye@pku.edu.cn;
+Shikun Zhang, zhangsk@pku.edu.cn
+1
+https://github.com/microsoft/muzic/tree/main/
+musicagent
+2
+https://youtu.be/tpNynjdcBqA
+Request
+LLM
+Task List
+Name
+Input
+Output
++
+Tool List
+Name
+Descrip
+-tion
+Name
+Descrip
+-tion
+Text
+Audio
+…
+Result
+Response
+Task Planning
+Tool Selection
+Task Execution
+Response Generation
+Figure 1: MusicAgent has gathered a rich collection
+of music-related tasks and diverse sources of tools, effectively integrating them with LLMs to achieve proficiency in handling complex music tasks.
+of tasks. Mastering this field presents a challenging
+endeavor due to the wide array of tasks it involves.
+Generally, the realm of music includes various generation and comprehension tasks, such as songwriting (Sheng et al., 2021; Ju et al., 2021), music generation (Agostinelli et al., 2023; Dai et al., 2021;
+Lu et al., 2023; Lv et al., 2023), audio transcription (Benetos et al., 2018; Foscarin et al., 2020),
+music retrieval (Wu et al., 2023b), etc. Specifically, music is a complex art form that weaves together a variety of distinct elements, such as chords
+and rhythm, to create vibrant and intricate content.
+Previous works have frequently encountered challenges in collaborating to complete complex music
+tasks, primarily due to differences in music feature
+designs and variations across platforms. Therefore,
+arXiv:2310.11954v2 [cs.CL] 25 Oct 2023
+how to build a system to automatically accomplish
+music-related tasks from the requests of users with
+varying levels of expertise is still an enticing direction worth exploring.
+Recently, large language models (LLMs) have attracted considerable attention due to their outstanding performance in solving natural language processing (NLP) tasks (Brown et al., 2020; Ouyang
+et al., 2022; Zhang et al., 2022b; Chowdhery et al.,
+2022; Zeng et al., 2022; Touvron et al., 2023).
+The huge potentials of LLMs also inspire and directly facilitate many emerging techniques (e.g.,
+in-context learning (Xie et al., 2021; Min et al.,
+2022), instruct tuning (Longpre et al., 2023; Wang
+et al., 2022), and chain-of-thought prompting (Wei
+et al., 2022; Kojima et al., 2022)), which also further elevate the capability of LLMs. On the basis of these LLM capabilities, many researchers
+have extended the scope of LLMs to various topics. They borrow the idea of acting LLMs as the
+controllers to orchestrate various domain-specific
+expert models for solving complex AI tasks, such
+as HuggingGPT (Shen et al., 2023), AutoGPT and
+other modality-specifics ones (Chen et al., 2022;
+Wu et al., 2023a; Huang et al., 2023). These successes also motivate us to explore the possibility to
+develop a system capable of assisting with various
+music-related tasks.
+Distinguishing from other modalities, incorporating LLMs with music presents the following
+features and challenges:
+1. Tool Diversity: On one hand, music-related
+tasks exhibit a wide range of diversity, and
+on the other hand, the corresponding tools for
+these tasks might not always reside on the
+same platform. These tools could be parameterized models available in open-source communities like GitHub, presented as software
+and applications, or even hosted through Web
+APIs for certain retrieval tasks. Considering
+all these factors is crucial when undertaking a
+comprehensive music workflow.
+2. Cooperation: The collaboration between music tools is also constrained by two factors.
+First, the diversity of music domain tasks
+leads to the absence of explicit input-output
+modality standards. Second, even when the
+modalities are identical, the music formats
+may differ, for instance, between symbolic
+music and audio music.
+To address these issues, we introduce MusicAgent, a specialized system designed to tackle the
+challenges. Inspired by recent work like HuggingGPT (Shen et al., 2023), MusicAgent is a framework that utilizes the power of LLMs as the controller and massive expert tools to accomplish user
+instructions, just as illustrated in Figure 1. For
+the toolset, in addition to utilizing the models provided by Hugging Face, we further integrate various methods from different sources, including code
+from GitHub and Web APIs. To make collaboration
+between diverse tools, MusicAgent enforces standardized input-output formats across various tasks
+to promote seamless cooperation between tools. As
+a music-related system, all samples are trimmed
+to fit within a single audio segment, facilitating
+fundamental music operations among samples. For
+more system details and guidance on integrating
+additional tools, please refer to Section 3.
+Overall, the MusicAgent presents several significant contributions:
+• Accessibility: MusicAgent eliminates the
+need to master complex AI music tools. By
+utilizing LLMs as the task planner, the system
+dynamically selects the most suitable methods for each music-related task, making music
+processing accessible to a broader audience.
+• Unity: MusicAgent bridges the gap between
+tools from diverse sources by unifying the
+data format (e.g., text, MIDI, ABC notation,
+audio). The system enables seamless cooperation among tools on different platforms.
+• Modularity: MusicAgent is highly extensible, allowing users to easily expand its functionality by implementing new functions, integrating GitHub projects, and incorporating
+Hugging Face models.
+2 Related Works
+2.1 AI-Empowered Music Processing
+Music generation and understanding are multifaceted tasks that encompass various sub-tasks. In
+the realm of music generation, these tasks involve
+melody generation (Yu et al., 2020; Zhang et al.,
+2022a; Yu et al., 2022), audio generation (Donahue et al., 2018), singing voice synthesis (Ren
+et al., 2020; Lu et al., 2020), and sound mixing. In
+contrast, music understanding encompasses track
+separation (Défossez et al., 2019), audio recognition, score transcription (Bittner et al., 2022), audio
+… … …
+…
+…
+…
+…
+Figure 2: MusicAgent consists of four core components: the task planner, tool selector, task executor, and response
+generator. Among these, the task planner, tool selector, and response generator are built upon language language
+models (LLMs). When users make requests, MusicAgent decomposes and organizes the requests into subtasks.
+The system then selects the most suitable tool for each task. The chosen tool processes the input and populates
+the anticipated output. The LLM subsequently organizes the output, culminating in a comprehensive and efficient
+music processing system.
+classification (Choi et al., 2017; Zeng et al., 2021),
+and music retrieval (Wu et al., 2023b). In addition
+to these diverse and complex music-related tasks,
+another significant challenge in traditional music
+processing is substantial differences in input and
+output formats across each task. These diversities
+in tasks and data formats also hinder the unification
+in music processing, which makes it difficult for us
+to develop a copilot for solving different musical
+tasks. Therefore, in this paper, we will discuss how
+to design a copilot to unified musical data format
+and combine these tools to automatically accomplish tasks by utilizing large language model.
+2.2 Large Language Models
+The field of natural language processing (NLP) is
+undergoing a revolutionary shift due to the emergence of large language models (LLMs). These
+models (Brown et al., 2020; Touvron et al., 2023)
+have exhibited powerful performance in various
+language tasks, such as translation, dialogue modeling, and code completion, making them a focal
+point in NLP.
+Based on these advantages, LLMs have been applied to many applications. Recently, a new trend
+is to use LLMs to build autonomous agents for
+task automation, just like AutoGPT 3
+and HuggingGPT (Shen et al., 2023). In these works, they will
+leverage an LLM as the controller to automatically
+analyze user requests and then invoke the appropriate tool for solving tasks. Although there are some
+successful trials in vision (Chen et al., 2022) or
+speech (Huang et al., 2023), it is still challenging
+to build an autonomous agent for music processing, due to its diversity and complexity in tasks
+and data. Therefore, we present a system called
+MusicAgent, which integrates various functions to
+handle multiple music-related tasks, to accomplish
+requests from different users, including novices
+and professionals.
+3
+https://github.com/Significant-Gravitas/
+Auto-GPT
+Table 1: Overview of tasks and the associated example tools in MusicAgent.
+Task Input Output Task Type Example Tool
+text-to-symbolic-music text symbolic music Generation MuseCoco4
+lyric-to-melody text symbolic music Generation ROC5
+singing-voice-synthesis text audio Generation HiFiSinger6
+text-to-audio text audio Generation AudioLDM
+timbre-transfer audio audio Generation DDSP7
+accompaniment symbolic music symbolic music Generation GetMusic8
+music-classification audio text Understanding Wav2vec2
+music-separation audio audio Understanding Demucs
+lyric-recognition audio text Understanding Whisper-large-zh9
+score-transcription audio text Understanding Basic-pitch
+artist/track-search text audio Auxiliary Spotify API10
+lyric-generation text text Auxiliary ChatGPT
+web-search text text Auxiliary Google API
+3 MusicAgent
+MusicAgent is a comprehensive system that enhances the capabilities of large language models
+(LLMs) and tailors them to the music domain
+by integrating additional data sources, dependent
+tools, and task specialization. As illustrated in Figure 2, MusicAgent designs an LLM-empowered
+autonomous workflow, which includes three key
+skills: Task Planner, Tool Selector, and Response
+Generator. These skills, along with the musicrelated tools forming the Task Executor, are integrated, resulting in a versatile system capable of
+executing various applications. In this section, we
+will delve into different aspects of this system, exploring its functionalities and contributions to the
+field of music processing.
+3.1 Tasks and Tools Collection
+Table 1 provides a comprehensive overview of the
+music-related tasks and representative tools gathered in the current MusicAgent. We have organized
+the task sets based on the music processing flow
+illustrated in Figure 3. Aside from generation and
+understanding tasks, the collected tasks are primarily categorized into three groups:
+4
+https://github.com/microsoft/muzic/tree/main/
+musecoco
+5
+https://github.com/microsoft/muzic
+6
+https://github.com/CODEJIN/HiFiSinger
+7
+https://github.com/magenta/ddsp
+8
+https://github.com/microsoft/muzic/tree/main/
+musecoco/getmusic
+9
+https://huggingface.co/jonatasgrosman/
+whisper-large-zh-cv11
+10https://spotify.com
+Textual
+Description
+- Emotion
+- Genre
+- Theme
+Symbolic
+Music
+- Melody
+- Accompaniment
+Audio - Singing Voice
+- Instrument Sound
+Mixing Separation
+Generation
+Understanding
+Figure 3: MusicAgent collects tasks and tools within
+the framework of music generation and understanding.
+It encompasses various tasks, including single-modal
+tasks and modality transfer tasks, such as converting
+sheet music to audio through singing voice synthesis.
+Generation tasks: This category includes textto-music, lyric-to-melody, singing-voice-synthesis,
+timbre-transfer, accompaniment, and etc. These
+tasks enable the collaborative music generation
+starting from simple descriptions.
+Understanding tasks: The tasks of musicclassification, music-separation, lyric recognition,
+melody generation …
+…
+relationships from music theory…
+…
+lyric: …
+…
+generate the lyrics … Finally, I used the
+and 0d63.wav …
+reason: …
+Figure 4: The LLM backend is responsible for the following steps: The Task Planner takes user requests and
+produces parsed task queue, the Tool Selector chooses suitable tools, and the Response Generator collects tool
+outputs and organizes the responses.
+and music-transcription are under this category.
+Combining these tasks enables the conversion of
+music into symbolic representation and the analysis
+of various music features.
+Auxiliary tasks: This category encompasses web
+search and various audio processing toolkits. Web
+search includes text search using the Google API,
+as well as music search through the Spotify API.
+These tasks primarily provide rich data sources and
+perform basic operations on audio/MIDI/text data,
+serving as auxiliary functions.
+Furthermore, Figure 3 illustrates the utilization
+of three main data formats in the system: i) text,
+which includes lyric, genre or any other attributes
+related to the music. ii) sheet music, represented
+as MIDI files, describes the score of the music. iii)
+audio, containing the sound of the music.
+3.2 Autonomous Workflow
+The MusicAgent system consists of two parts: the
+autonomous workflow and the plugins. The autonomous workflow serves as the core LLM interaction component, as shown in Figure 2, and
+it comprises three skills: Task Planner, Tool Selector, and Response Generator, all supported by
+the LLM. Figure 4 further demonstrates how these
+components work together harmoniously.
+Task Planner: The Task Planner plays a critical
+role in converting user instructions into structured
+information, as most existing music tools only accept specialized inputs. The user input processed
+by the Task Planner will form the backbone of the
+entire workflow, encompassing the determination
+of each subtask and its corresponding input-output
+format, as well as the dependencies between the
+subtasks, creating a dependency graph. Leveraging in-context learning, MusicAgent demonstrates
+excellent task decomposition performance. We provide task planner descriptions, supported tasks, and
+information structure in the prompt, along with
+several examples of music task-related decompositions. The user’s interaction history and current
+input will replace the content at the corresponding
+position in the prompt. By utilizing the Semantic
+Kernel (Microsoft, 2023), users can insert the required task flow in text format, thereby enhancing
+task planning effectiveness.
+Tool Selector: The Tool Selector chooses the most
+appropriate tool from the open-source tools relevant to a specific subtask. Each tool is associated
+with its unique attributes, such as textual descriptions, download count, star ratings, and more. By
+incorporating these tool attributes with the user
+input, LLM presents the tool’s ID and corresponding reasoning for what it deems the most suitable
+selection. Users have the flexibility to adjust the
+tool attributes and determine how LLM interprets
+these attributes. For instance, users can emphasize
+download count to meet diverse requirements.
+Response Generator: The Response Generator
+gathers all intermediate results from the execution
+of subtasks and ultimately compiles them into a
+coherent response. Examples in Figure 5 demonstrate how LLM organizes the tasks and results to
+generate answers.
+3.3 Plugins
+When all the dependent tasks of a subtask have
+been completed, and all inputs have been instantiated, the LLM backend passes the task to the
+Task Executor, where the tool selects the necessary
+parameters from the inputs. Additionally, the tool
+needs to identify the task type, as a tool may handle
+multiple tasks.
+MusicAgent stores model parameters on the
+CPU and only loads them into the GPU when actively in use. This approach is especially advantageous for users with limited GPU memory, as it
+optimizes resource utilization and ensures smooth
+task execution without overburdening the GPU
+memory.
+4 System Usage
+In this section, we will provide comprehensive
+guidelines on how to effectively use the MusicAgent toolkit.
+4.1 Code Usage
+Users have the flexibility to run this system either
+by following the instructions on GitHub or by integrating it as a module in their code or using it
+through the command line for more advanced usage, enabling the incorporation of custom tools. As
+depicted in Listing 1, users can add custom task
+types, update tool attributes, and design prompts for
+each subtask, enhancing support for specific tasks.
+It is important to note that embedding the prompt
+in the history is a temporary operation, and there is
+a possibility of overlap if the context exceeds the
+limit. For permanent storage, it is recommended to
+directly include the prompt in the code.
+# # 1. Initialze the agent
+from agent import MusicAgent
+music_agent = MusicAgent ( CONFIG_PATH )
+# # 2. Add custom tasks and tools
+music_agent . task_map [ MY_TASK ]. append (
+MY_TOOL )
+music_agent . pipelines . append (
+MY_TOOL_CLASS )
+# Update prompts
+music_agent . _init_task_context ()
+music_agent . _init_tool_context ()
+# # 3. Update tool 's information
+music_agent . update_tool_attributes (
+MY_TOOL , { " stars " :.. , " likes " :..})
+music_agent . _init_tool_context ()
+# # 4. Update the prompt
+# Take task planner as an example
+# There is a risk of being overwritten
+music_agent . task_context [ " history " ] +=
+" MY ␣ CUSTOM ␣ PROMPT "
+# # 5. Chat with the agent
+music_agent . chat ( " Generate ␣ a ␣ song ... " )
+Listing 1: Code usage of MusicAgent
+4.2 Demo Usage
+Apart from command-line usage, we have also provided a Gradio demo for users, where an OpenAI
+token is required. In the Gradio demo, users can
+directly upload audio and visually observe all the
+intermediate results generated by the system, as
+depicted in Figure 6. Additionally, although MusicAgent includes built-in context truncation, users
+can still clear all LLM interaction history in the
+interface to refresh the agent.
+5 Conclusion
+In this paper, we introduce MusicAgent, an LLMpowered autonomous agent in the music domain.
+Our system can be considered as an auxiliary tool
+to help developers or audiences to automatically
+analyze user requests and select appropriate tools
+as solutions. Moreover, our framework directly
+integrates numerous music-related tools from various sources (e.g., Hugging Face, GitHub, Web
+search and etc). We also adapt the autonomous
+workflow to enable better compatibility in musical
+tasks and allow users to extend its toolset. In the
+future, we also further envision integrating more
+music-related functions into MusicAgent.
+Acknowledgements
+We extend our gratitude to all anonymous reviewers
+and members of the Machine Learning group at Microsoft Research Asia for their valuable contributions and insightful suggestions in the development
+of this system.
+
+A Appendix
+To generate a Chinese poetry song for
+you, I first used the ChatGPT model to
+generate the lyrics: …. Then, I used the
+muzic/roc model to convert the lyrics to
+sheet music, and generated the sheet
+music file e3a1.mid, and the
+corresponding audio file e3a1.wav. Next,
+I used the DiffSinger model to convert
+the sheet music to audio, and generated
+the audio file 486f.wav. Finally, I used the
+basic-merge model to convert the
+e3a1.wav and the 486f.wav. 486f.wav to
+generate the final audio file 726f.wav.
+You can find these files in the
+public/audios/ directory.
+Generate a song in the
+style of Chinese poetry
+Download some songs by Jay Chou and
+analyze their styles
+To download a Jay Chou song for you and
+separate the vocals in it, I first searched
+Jay Chou's songs from Spotify using the
+track-search model, and the search results
+included three versions of "Tracks", which
+are public/audios/8440.mp3,
+public/audios/f68e.mp3, and public/
+audios/840e.mp3. Then, I analyze these
+three songs with wav2vec2 modeling and
+finally get that all of them are in pop style.
+Converting vocals to violin in 8440.mp3
+To convert the vocals in 8440.mp3 to the
+sound of a violin, I first used the demucs
+model to separate the 8440.mp3 into the
+human vocal file 05aa.wav, and then I used
+the ddsp model to convert the 05aa.wav
+into the sound of a violin, generating
+9561.wav. you can find these files in the
+public/audios/ directory.
+Figure 5: Sample Q&A for users and agents.
+Figure 6: Gradio Demomstration

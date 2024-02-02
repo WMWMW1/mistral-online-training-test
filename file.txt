@@ -1,0 +1,1393 @@
+
+Vision Mamba: Efficient Visual Represe
+State Space
+Lianghui Zhu1∗, Bencheng Liao1∗, Qian Zhang2, Xi
+1 Huazhong University of S
+2 Horizon Robotics
+3 Beijing Ac
+Code & Models: h
+42
+43
+44
+45
+46
+Detection
+mAP (%)
+36
+37
+38
+39
+40
+Ins. Seg.
+mAP (%)
+70
+71
+72
+73
+74
+Classification
+Top-1 Acc. (%)
+37
+38
+39
+40
+41
+Sem. Seg.
+mIoU (%)
+(a) Accuracy Comparison
+1
+1.4
+1.8
+2.2
+2.6
+512
+640
+73
+FPS w/ log scale
+Resol
+DeiT-Ti
+Vim-T
+2.54
+2.25
+2.05
+2.29
+2.0
+(b) Speed Co
+DeiT-Ti
+Vim-Ti
+Faster
+Figure 1. Performance and efficiency comparisons between DeiT [60] a
+DeiT and Vim on IN1K classification dataset [10], then we finetune
+tasks, i.e., semantic segmentation, object detection, instance segmenta
+both pretraining and finetuning tasks. For the speed comparison, the p
+large images because of its subquadratic-time computation. For the GPU
+for inferring large images by its linear memory complexity. With not
+more efficient than DeiT in dealing with large images. For example, V
+performing batch inference to extract features on images with a resoluti
+Abstract
+Recently the state space models (SSMs) with efficient
+hardware-aware designs, i.e., Mamba, have shown great
+potential for long sequence modeling. Building efficient and
+generic vision backbones purely upon SSMs is an appealing
+direction. However, representing visual data is challenging
+for SSMs due to the position-sensitivity of visual data and
+the requirement of global context for visual understanding.
+In this paper, we show that the reliance of visual representa-
+tion learning on self-attention is not necessary and propose
+a new generic vision backbone with bidirectional Mamba
+blocks (Vim), which marks the image sequences with po-
+sition embeddings and compresses the visual representa-
+tion with bidirectional state space models. On ImageNet
+classification, COCO object detection, and ADE20k seman-
+tic segmentation tasks, Vim achieves higher performance
+compared to well-established vision transformers like DeiT,
+∗ Lianghui Zhu and Bencheng Liao contributed equally to this work.
+
+entation Learning with Bidirectional
+e Model
+inlong Wang3, Wenyu Liu1, Xinggang Wang1 
+
+--- End of Page ---
+
+and S4D [23], are proposed to process sequence data across
+a wide range of tasks and modalities, particularly on mod-
+li
+l
+d
+d
+i
+Th
+ffi i
+l
+formers, Vim can be pretrained on large-scale unsupervised
+visual data for better visual representation. Thanks to the
+b
+ffi i
+f M
+b
+h
+l
+l
+i i
+f
+
+eling long-range dependencies. They are efficient on long
+sequences because of convolutional computation and near-
+linear computation.
+2-D SSM [2], SGConvNeXt [37],
+and ConvSSM [52] combine SSM with CNN or Trans-
+former architecture to process 2-D data. The recent work,
+Mamba [20], incorporates time-varying parameters into the
+SSM and proposes a hardware-aware algorithm to enable
+efficient training and inference. The superior scaling per-
+formance of Mamba indicates that it is a promising alter-
+native to Transformer in language modeling. Nevertheless,
+a generic pure-SSM-based backbone has not been explored
+for vision tasks.
+Vision Transformers (ViTs) have achieved great success
+in visual representation learning, excelling in both large-
+scale self-supervised pre-training and high performance on
+downstream tasks.
+Compared with convolutional neural
+networks, the core advantage lies in that ViT can provide
+each image patch with data/patch-dependent global context
+through self-attention. This differs from convolutional net-
+works that use the same parameters, i.e., the convolutional
+filters, for all positions. Another advantage is the modality-
+agnostic modeling by treating an image as a sequence of
+patches without 2D inductive bias, which makes it the pre-
+ferred architecture for multimodal applications [3, 36, 40].
+At the same time, the self-attention mechanism in Trans-
+formers poses challenges in terms of speed and memory us-
+age when dealing with long-range visual dependencies, e.g.,
+processing high-resolution images.
+Motivated by the success of Mamba in language mod-
+eling, it is appealing that we can also transfer this success
+from language to vision, i.e., to design a generic and ef-
+ficient visual backbone with the advanced SSM method.
+However, there are two challenges for Mamba, i.e., unidi-
+rectional modeling and lack of positional awareness. To
+address these challenges, we propose the Vision Mamba
+(Vim) block, which incorporates the bidirectional SSMs for
+data-dependent global visual context modeling and position
+embeddings for location-aware visual recognition. We first
+split the input image into patches and linearly project them
+as vectors to Vim.
+Image patches are treated as the se-
+quence data in Vim blocks, which efficiently compresses
+the visual representation with the proposed bidirectional se-
+lective state space. Furthermore, the position embedding
+in Vim block provides the awareness for spatial informa-
+tion, which enables Vim to be more robust in dense predic-
+tion tasks. In the current stage, we train the Vim model on
+the supervised image classification task using the ImageNet
+dataset and then use the pretrained Vim as the backbone to
+perform sequential visual representation learning for down-
+stream dense prediction tasks, i.e., semantic segmentation,
+object detection, and instance segmentation. Like Trans-
+2
+
+better efficiency of Mamba, the large-scale pretraining of
+Vim can be achieved with lower computational cost.
+Compared with other SSM-based models for vision
+tasks, Vim is a pure-SSM-based method and models im-
+ages in a sequence manner, which is more promising for a
+generic and efficient backbone. Thanks to the bidirectional
+compressing modeling with positional awareness, Vim is
+the first pure-SSM-based model to handle dense prediction
+tasks. Compared with the most convincing Transformer-
+based model, i.e., DeiT [60], Vim achieves superior per-
+formance on ImageNet classification.
+Furthermore, Vim
+is more efficient in terms of GPU memory and inference
+time for high-resolution images. The efficiency in terms of
+memory and speed empowers Vim to directly perform se-
+quential visual representation learning without relying on
+2D priors (such as the 2D local window in ViTDet [38]) for
+high-resolution visual understanding tasks while achieving
+higher accuracy than DeiT.
+Our main contributions can be summarized as follows:
+• We propose Vision Mamba (Vim), which incorporates
+bidirectional SSM for data-dependent global visual con-
+text modeling and position embeddings for location-
+aware visual understanding.
+• Without the need of attention, the proposed Vim has
+the same modeling power as ViT while it only has
+subquadratic-time computation and linear memory com-
+plexity. Specifically, our Vim is 2.8× faster than DeiT
+and saves 86.8% GPU memory when performing batch
+inference to extract features on images at the resolution
+of 1248×1248.
+• We conduct extensive experiments on ImageNet classi-
+fication and dense prediction downstream tasks. The re-
+sults demonstrate that Vim achieves superior performance
+compared to the well-established and highly-optimized
+plain vision Transformer, i.e., DeiT.
+• Benefiting from the efficient hardware-aware design of
+Mamba, Vim is much more efficient than the self-
+attention-based DeiT [60] for high-resolution computer
+vision tasks, e.g., video segmentation, aerial image anal-
+ysis, medical image segmentation, computational pathol-
+ogy.
+2. Related Work
+Architectures for generic vision backbone.
+In the early
+eras, ConvNet [34] serves as the de-facto standard network
+design for computer vision. Many convolutional neural ar-
+chitectures [25, 26, 33, 50, 51, 56–58, 63, 72] have been
+proposed as the vision backbone for various visual applica-
+tions. The pioneering work, Vision Transformer (ViT) [14]
+changes the landscape. It treats an image as a sequence of
+flattened 2D patches and directly applies a pure Transformer
+
+
+--- End of Page ---
+
+architecture. The surprising results of ViT on image classi-
+fication and its scaling ability encourage a lot of follow-up
+k [16 59 61 62]
+O
+li
+f
+k f
+h
+SSM without attention.
+
+works [16, 59, 61, 62]. One line of works focuses on hy-
+brid architecture designs by introducing 2D convolutional
+priors into ViT [9, 13, 15, 69]. PVT [66] proposes a pyra-
+mid structure Transformer. Swin Transformer [42] applies
+self-attention within shift windows. Another line of works
+focuses on improving traditional 2D ConvNets with more
+advanced settings [41, 67]. ConvNeXt [43] reviews the de-
+sign space and proposes pure ConvNets, which can be scal-
+able as ViT and its variants. RepLKNet [12] proposes to
+scale up the kernel size of existing ConvNets to bring im-
+provements.
+Though these dominant follow-up works demonstrate
+superior
+performance
+and
+better
+efficiency
+on
+Ima-
+geNet [10] and various downstream tasks [39, 74] by in-
+troducing 2D priors, with the surge of large-scale visual
+pretraining [1, 5, 17] and multi-modality applications [3,
+29, 35, 36, 40, 49], vanilla Transformer-style model strikes
+back to the center stage of computer vision. The advantages
+of larger modeling capacity, unified multi-modality repre-
+sentation, being friendly to self-supervised learning etc.,
+make it the preferred architecture. However, the number
+of visual tokens is limited due to the quadratic complexity
+of Transformer. There are plenty of works [7, 8, 11, 32, 48,
+55, 65] to address this long-standing and prominent chal-
+lenge, but few of them focus on visual applications. Re-
+cently, LongViT [68] built an efficient Transformer archi-
+tecture for computational pathology applications via dilated
+attention. The linear computation complexity of LongViT
+allows it to encode the extremely long visual sequence. In
+this work, we draw inspiration from Mamba [20] and ex-
+plore building a pure-SSM-based model as a generic vision
+backbone without using attention, while preserving the se-
+quential, modality-agnostic modeling merit of ViT.
+State space models for long sequence modeling.
+[21]
+proposes a Structured State-Space Sequence (S4) model, a
+novel alternative to CNNs or Transformers, to model the
+long-range dependency. The promising property of linearly
+scaling in sequence length attracts further explorations. [53]
+proposes a new S5 layer by introducing MIMO SSM and
+efficient parallel scan into S4 layer.
+[18] designs a new
+SSM layer, H3, that nearly fills the performance gap be-
+tween SSMs and Transformer attention in language mod-
+eling. [46] builds the Gated State Space layer on S4 by
+introducing more gating units to improve the expressivity.
+Recently, [20] proposes a data-dependent SSM layer and
+builds a generic language model backbone, Mamba, which
+outperforms Transformers at various sizes on large-scale
+real data and enjoys linear scaling in sequence length. In
+this work, we explore transferring the success of Mamba to
+vision, i.e., building a generic vision backbone purely upon
+3
+
+State space models for visual applications.
+[27] uses
+1D S4 to handle the long-range temporal dependencies for
+video classification.
+[47] further extends 1D S4 to han-
+dle multi-dimensional data including 2D images and 3D
+videos. [28] combines the strengths of S4 and self-attention
+to build TranS4mer model, achieving state-of-the-art per-
+formance for movie scene detection. [64] introduces a novel
+selectivity mechanism to S4, largely improving the perfor-
+mance of S4 on long-form video understanding with a much
+lower memory footprint. [73] supplants attention mecha-
+nisms with a more scalable SSM-based backbone to gen-
+erate high-resolution images and process fine-grained rep-
+resentation under affordable computation.
+[45] proposes
+U-Mamba, a hybrid CNN-SSM architecture, to handle the
+long-range dependencies in biomedical image segmenta-
+tion. The above works either apply SSM to specific visual
+applications or build a hybrid architecture by combining
+SSM with convolution or attention. Different from them,
+we build a pure-SSM-based model, which can be adopted
+as a generic vision backbone.
+3. Method
+The goal of Vision Mamba (Vim) is to introduce the ad-
+vanced state space model (SSM), i.e., Mamba [20], to com-
+puter vision. This section begins with a description of the
+preliminaries of SSM. It is followed by an overview of Vim.
+We then detail how the Vim block processes input token se-
+quences and proceed to illustrate the architecture details of
+Vim. The section concludes with an analysis of the effi-
+ciency of the proposed Vim.
+3.1. Preliminaries
+The SSM-based models, i.e., structured state space se-
+quence models (S4) and Mamba are inspired by the con-
+tinuous system, which maps a 1-D function or sequence
+x(t) ∈ R 7→ y(t) ∈ R through a hidden state h(t) ∈ RN.
+This system uses A ∈ RN×N as the evolution parameter and
+B ∈ RN×1, C ∈ R1×N as the projection parameters.
+h′(t) = Ah(t) + Bx(t),
+y(t) = Ch(t).
+(1)
+The S4 and Mamba are the discrete versions of the con-
+tinuous system, which include a timescale parameter ∆ to
+transform the continuous parameters A, B to discrete pa-
+rameters A, B. The commonly used method for transfor-
+mation is zero-order hold (ZOH), which is defined as fol-
+lows:
+A = exp (∆A),
+B = (∆A)−1(exp (∆A) − I) · ∆B.
+(2)
+
+
+--- End of Page ---
+
+After the discretization of A, B, the discretized version
+of Eq. (1) using a step size ∆ can be rewritten as:
+Algorithm 1: Vim Block Process
+Input: token sequence Tl−1 : (B, M, D)
+
+ht = Aht−1 + Bxt,
+yt = Cht.
+(3)
+At last, the models compute output through a global con-
+volution.
+K = (CB, CAB, . . . , CA
+M−1B),
+y = x ∗ K,
+(4)
+where M is the length of the input sequence x, and K ∈ RM
+is a structured convolutional kernel.
+3.2. Vision Mamba
+An overview of the proposed Vim is shown in Fig. 2. The
+standard Mamba is designed for the 1-D sequence.
+To
+process the vision tasks, we first transform the 2-D image
+t ∈ RH×W×C into the flattened 2-D patches xp ∈ RJ×(P2·C),
+where (H, W) is the size of input image, C is the number of
+channels, P is the size of image patches. Next, we linearly
+project the xp to the vector with size D and add position
+embeddings Epos ∈ R(J+1)×D, as follows:
+T0 = [tcls; t1
+pW; t2
+pW; · · · ; tJ
+pW] + Epos,
+(5)
+where tj
+p is the j-th patch of t, W ∈ R(P2·C)×D is the
+learnable projection matrix.
+Inspired by ViT [14] and
+BERT [31], we also use class token to represent the whole
+patch sequence, which is denoted as tcls. We then send
+the token sequence (Tl−1) to the l-th layer of the Vim en-
+coder, and get the output Tl. Finally, we normalize the out-
+put class token T0
+L and feed it to the multi-layer perceptron
+(MLP) head to get the final prediction ˆp, as follows:
+Tl = Vim(Tl−1) + Tl−1,
+f = Norm(T0
+L),
+ˆp = MLP(f),
+(6)
+where Vim is the proposed vision mamba block, L is the
+number of layers, and Norm is the normalization layer.
+3.3. Vim Block
+The original Mamba block is designed for the 1-D se-
+quence, which is not suitable for vision tasks requiring
+spatial-aware understanding. In this section, we introduce
+the Vim block, which incorporates the bidirectional se-
+quence modeling for the vision tasks. The Vim block is
+shown in Fig. 2.
+Specifically, we present the operations of Vim block in
+Algo. 1. The input token sequence Tl−1 is first normal-
+ized by the normalization layer. Next, we linearly project
+4
+
+Output: token sequence Tl : (B, M, D)
+/* normalize the input sequence T′
+l−1 */
+1 T′
+l−1 : (B, M, D) ← Norm(Tl−1)
+2 x : (B, M, E) ← Linearx(T′
+l−1)
+3 z : (B, M, E) ← Linearz(T′
+l−1)
+/* process with different direction */
+4 for o in {forward, backward} do
+5
+x′
+o : (B, M, E) ← SiLU(Conv1do(x))
+6
+Bo : (B, M, N) ← LinearB
+o (x′
+o)
+7
+Co : (B, M, N) ← LinearC
+o (x′
+o)
+/* softplus ensures positive ∆o */
+8
+∆o : (B, M, E) ←
+log(1 + exp(Linear∆
+o (x′
+o) + Parameter∆
+o ))
+/* shape of ParameterA
+o
+is (E, N) */
+9
+Ao : (B, M, E, N) ← ∆o
+N ParameterA
+o
+10
+Bo : (B, M, E, N) ← ∆o
+N Bo
+11
+yo : (B, M, E) ← SSM(Ao, Bo, Co)(x′
+o)
+12 end
+/* get gated yo */
+13 y′
+forward : (B, M, E) ← yforward
+J SiLU(z)
+14 y′
+backward : (B, M, E) ← ybackward
+J SiLU(z)
+/* residual connection */
+15 Tl : (B, M, D) ← LinearT(y′
+forward + y′
+backward) + Tl−1
+16 Return: Tl
+the normalized sequence to the x and z with dimension size
+E. Then, we process the x from the forward and backward
+directions. For each direction, we first apply the 1-D convo-
+lution to the x and get the x′
+o. We then linearly project the
+x′
+o to the Bo, Co, ∆o, respectively. The ∆o is then used to
+transform the Ao, Bo, respectively. Finally, we compute the
+yforward and ybackward through the SSM. The yforward
+and ybackward are then gated by the z and added together to
+get the output token sequence Tl.
+3.4. Architecture Details
+In summary, the hyper-parameters of our architecture are
+listed as follows:
+L: the number of blocks,
+D: the hidden state dimension,
+E: expanded state dimension,
+N: SSM dimension.
+Following ViT [14] and DeiT [61], we first employ 16×16
+kernel size projection layer to get a 1-D sequence of non-
+overlapping patch embeddings. Subsequently, we directly
+stack L Vim blocks. By default, we set the number of blocks
+L to 24, SSM dimension N to 16. To align with the model
+
+
+--- End of Page ---
+
+E
+𝑥
+Forward
+C
+1d
+Forward
+SSM
+L×
+Prediction
+MLP
+Projection Layer
+Patch Tokens
+
+Embedded Patches
+Norm
+Input Image
+Vision Mamba Encoder
+Flatten and Linear Projection
+* 0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+Patch Tokens
+Position Embed.
+Class Token
+0 1
+*
+Vision Mamba (Vim)
+Figure 2. The overview of the proposed Vim model. We first split the
+Last, we send the sequence of tokens to the proposed Vim encoder. To p
+classification token to the patch token sequence. Different from Mam
+sequence with both forward and backward directions.
+sizes of DeiT series, we set the hidden state dimension D to
+192 and expanded state dimension E to 384 for the tiny-size
+variant. For the small-size variant, we set D to 384 and E to
+768.
+3.5. Efficiency Analysis
+Traditional SSM-based methods leverage the fast Fourier
+transform to boost the convolution operation as shown in
+Eq. (4). For data-dependent methods, such as Mamba, the
+SSM operation in Line 11 of Algo. 1 is no longer equiva-
+lent to convolution. To address this problem, Mamba and
+the proposed Vim choose a modern-hardware-friendly way
+to ensure efficiency. The key idea of this optimization is
+to avoid the IO-bound and memory-bound of modern hard-
+ware accelerators (GPUs).
+IO-Efficiency.
+The high bandwidth memory (HBM) and
+SRAM are two important components for GPUs. Among
+them, SRAM has a larger bandwidth and HBM has a bigger
+memory size. The standard implementation of Vim’s SSM
+operation with HBM requires the number of memory IO on
+the order of O(BMEN). Inspired by Mamba, Vim first reads
+in O(BME + EN) bytes of memory (∆o, Ao, Bo, Co) from
+slow HBM to fast SRAM. Then, Vim gets the discrete Ao,
+Bo of a size of (B, M, E, N) in SRAM. Last, Vim performs
+SSM operations in SRAM and writes the output of a size of
+(B, M, E) back to HBM. This method can help to reduce IOs
+from O(BMEN) to O(BME + EN).
+Memory-Efficiency.
+To avoid out-of-memory problems
+and achieve lower memory usage when dealing with long
+sequences, Vim chooses the same recomputation method as
+Mamba. For the intermediate states of size (B, M, E, N) to
+calculate the gradient, Vim recomputes them at the network
+backward pass. For intermediate activations such as the out-
+put of activation functions and convolution, Vim also re-
+computes them to optimize the GPU memory requirement,
+5
+
+m
+Conv1d
+Backward
+Conv1d
+SSM
+Backward
+SSM
+Vision Mamba Encoder
+Activation
+𝑧
+input image into patches, and then project them into patch tokens.
+perform ImageNet classification, we concatenate an extra learnable
+mba for text sequence modeling, Vim encoder processes the token
+as the activation values take a lot of memory but are fast for
+recomputation.
+Computation-Efficiency.
+SSM in Vim block (Line 11 in
+Algo.1) and self-attention in Transformer both play a key
+role in providing global context adaptively. Given a visual
+sequence T ∈ R1×M×D and the default setting E = 2D, the
+computation complexity of a global self-attention and SSM
+are:
+Ω(self-attention) = 4MD2 + 2M2D,
+(7)
+Ω(SSM) = 3M(2D)N + M(2D)N2,
+(8)
+where self-attention is quadratic to sequence length M, and
+SSM is linear to sequence length M (N is a fixed parameter,
+set to 16 by default). The computational efficiency makes
+Vim scalable for gigapixel applications with large sequence
+lengths.
+4. Experiment
+4.1. Image Classification
+Settings.
+We benchmark Vim on the ImageNet-1K
+dataset [10], which contains 1.28M training images and
+50K validation images from 1,000 categories.
+All mod-
+els are trained on the training set, and top-1 accuracy on
+the validation set is reported.
+For fair comparisons, our
+training settings mainly follow DeiT [61]. Specifically, we
+apply random cropping, random horizontal flipping, label-
+smoothing regularization, mixup, and random erasing as
+data augmentations. When training on 2242 input images,
+we employ AdamW [44] with a momentum of 0.9, a total
+batch size of 1024, and a weight decay of 0.05 to optimize
+models. We train the Vim models for 300 epochs using a
+cosine schedule, 1×10−3 initial learning rate, and EMA.
+During testing, we apply a center crop on the validation set
+to crop out 2242 images. Experiments are performed on 8
+A800 GPUs.
+
+
+--- End of Page ---
+
+Method
+image
+size
+#param.
+ImageNet
+top-1 acc.
+over DeiT-Small. Compared with SSM-based S4ND-ViT-
+B [47], Vim achieves similar top-1 accuracy with 3× fewer
+
+Convnets
+ResNet-18 [25]
+2242
+12M
+69.8
+ResNet-50 [25]
+2242
+25M
+76.2
+ResNet-101 [25]
+2242
+45M
+77.4
+ResNet-152 [25]
+2242
+60M
+78.3
+ResNeXt50-32x4d [72]
+2242
+25M
+77.6
+RegNetY-4GF [50]
+2242
+21M
+80.0
+Transformers
+ViT-B/16 [14]
+3842
+86M
+77.9
+ViT-L/16 [14]
+3842
+307M
+76.5
+DeiT-Ti [61]
+2242
+6M
+72.2
+DeiT-S [61]
+2242
+22M
+79.8
+SSMs
+S4ND-ViT-B [47]
+2242
+89M
+80.4
+Vim-Ti
+2242
+7M
+73.1
+Vim-S
+2242
+26M
+80.3
+Table 1. Comparison with different backbones on ImageNet-1K
+validation set.
+Method
+Backbone
+image
+size
+#param.
+val
+mIoU
+DeepLab v3+ [6]
+ResNet-101
+5122
+63M
+44.1
+UperNet [71]
+ResNet-50
+5122
+67M
+41.2
+UperNet [71]
+ResNet-101
+5122
+86M
+44.9
+UperNet [71]
+DeiT-Ti
+5122
+11M
+39.2
+UperNet [71]
+DeiT-S
+5122
+43M
+44.0
+UperNet [71]
+Vim-Ti
+5122
+13M
+40.2
+UperNet [71]
+Vim-S
+5122
+46M
+44.9
+Table 2. Results of semantic segmentation on the ADE20K val
+set.
+Results.
+Tab. 1 compares Vim with ConvNet-based,
+Transformer-based and SSM-based backbones. Compared
+to ConvNet-based ResNet [25], Vim demonstrates supe-
+rior performance.
+For example, when the parameters
+are roughly similar, the top-1 accuracy of Vim-Small
+reaches 80.3, which is 4.1 points higher than that of
+ResNet50. Compared with the conventional self-attention-
+based ViT [14], Vim outperforms it by considerable margins
+in terms of both parameter numbers and classification accu-
+racy. When compared to the highly-optimized ViT-variant,
+i.e., DeiT [61], Vim surpasses it at different scales with
+comparable parameter numbers: 0.9 points higher for Vim-
+Tiny over DeiT-Tiny, and 0.5 points higher for Vim-Small
+6
+
+parameters.
+Fig. 1 (b) and (c) compare the FPS and GPU memory
+of tiny-size Vim and DeiT. Vim demonstrates better effi-
+ciency in speed and memory as image resolution grows.
+Specifically, when the image size is 512, Vim achieves sim-
+ilar FPS and memory as DeiT. As the image size grows to
+1248, Vim is 2.8× faster than DeiT and saves 86.8% GPU
+memory. The pronounced superiority of Vim’s linear scal-
+ing in sequence length makes it ready for high-resolution
+downstream vision applications and long-sequence multi-
+modality applications.
+4.2. Semantic Segmentation
+Settings.
+We conduct experiments for semantic segmen-
+tation on the ADE20K [74] dataset. ADE20K contains 150
+fine-grained semantic categories, with 20K, 2K, and 3K im-
+ages for training, validation, and testing, respectively. We
+choose UperNet [70] as our base framework. In training,
+we employ AdamW with a weight decay of 0.01, and a total
+batch size of 16 to optimize models. The employed train-
+ing schedule uses an initial learning rate of 6×10−5, linear
+learning rate decay, a linear warmup of 1, 500 iterations,
+and a total training of 160K iterations. The data augmenta-
+tions follow common settings, including random horizontal
+flipping, random re-scaling within the ratio range [0.5, 2.0],
+and random photometric distortion. During evaluation, we
+rescale the image to have a shorter side of 512.
+Results.
+As shown in Tab. 2, Vim consistently outper-
+forms DeiT across different scales: 1.0 mIoU higher for
+Vim-Ti over DeiT-Ti, and 0.9 mIoU higher for Vim-S over
+DeiT-S. Compared to the ResNet-101 backbone, our Vim-
+S achieves the same segmentation performance with nearly
+2× fewer parameters.
+To further evaluate the efficiency for downstream tasks,
+i.e., segmentation, detection, and instance segmentation, we
+combine the backbones with a commonly used feature pyra-
+mid network (FPN) module and benchmark their FPS and
+GPU memory. As shown in Fig. 3 and Fig. 4, the efficiency
+curves demonstrate similar comparison results of the pure
+backbone (Fig. 1), though we append a heavy FPN on the
+backbones. The exceptional linear scaling performance is
+attributed to our proposed efficient backbone Vim, which
+builds the foundation for learning gigapixel-level visual rep-
+resentation in an end-to-end manner without the need for
+multi-stage encoding (e.g., aerial image, medical image,
+and computational pathology).
+4.3. Object Detection and Instance Segmentation
+Settings.
+We conduct experiments for object detection
+and instance segmentation on the COCO 2017 dataset [39].
+
+
+--- End of Page ---
+
+2.6
+2.52
+2.27
+80
+DeiT
+Vim
+OOM
+
+1
+1.4
+1.8
+2.2
+512
+640
+738
+1024
+1248
+FPS w/ log scale
+Resolution
+DeiT
+Vim
+2.24
+2.00
+1.56
+1.25
+2.06
+1.90
+1.70
+Faster
+2.8× faster
+Figure 3. FPS comparison between DeiT-Ti [60] and our Vim-
+Ti on the commonly used downstream framework. We perform
+batch inference and benchmark the log-scaled FPS on the archi-
+tecture with the backbone and FPN. Vim achieves comparable per-
+formance to DeiT with a small resolution, i.e., 512. As the input
+image resolution increases, Vim will have a higher FPS.
+Backbone
+APbox APbox
+50
+APbox
+75
+APbox
+s
+APbox
+m
+APbox
+l
+DeiT-Ti
+44.4
+63.0
+47.8
+26.1
+47.4
+61.8
+Vim-Ti
+45.7
+63.9
+49.6
+26.1
+49.0
+63.2
+Backbone
+APmask APmask
+50
+APmask
+75
+APmask
+s
+APmask
+m
+APmask
+l
+DeiT-Ti
+38.1
+59.9
+40.5
+18.1
+40.5
+58.4
+Vim-Ti
+39.2
+60.9
+41.7
+18.2
+41.8
+60.2
+Table 3. Results of object detection and instance segmentation on
+the COCO val set using Cascade Mask R-CNN [4] framework.
+The COCO 2017 dataset contains 118K images for train-
+ing, 5K images for validating, and 20K images for testing.
+We use the canonical Cascade Mask R-CNN [4] as the base
+framework. For ViT-based backbones, we apply extra con-
+figurations (e.g., interleaved window & global attention) to
+handle the high-resolution images following ViTDet [38].
+For SSM-based Vim, we directly use it without any modi-
+fications. Other training and evaluation settings are just the
+same. During training, we employ AdamW with a weight
+decay of 0.1, and a total batch size of 64 to optimize models.
+The employed training schedule uses an initial learning rate
+of 1×10−4, linear learning rate decay, and a total training
+of 380K iterations. The data augmentations use large-scale
+jitter data augmentation [19] to 1024×1024 input images.
+During evaluation, we rescale the image to have a shorter
+side of 1024.
+Results.
+Tab. 3 compares Vim-Ti with DeiT-Ti using Cas-
+cade Mask R-CNN framework [4]. Vim-Ti surpasses DeiT-
+Ti by 1.3 box AP and 1.1 mask AP. For the middle-size
+and large-size objects, Vim-Ti outperforms DeiT-Ti by 1.6
+APbox
+m /1.3 APmask
+m
+and 1.4 APbox
+l
+/1.8 APmask
+l
+, demonstrating
+better long-range context learning than DeiT (Fig. 5).
+7
+
+5
+20
+35
+50
+65
+512
+640
+738
+1024
+1248
+GPU Memory (GB)
+Resolution
+Smaller
+-73.2% memory
+5.04
+6.88
+8.54
+15.86
+22.59
+5.52
+8.09
+12.48
+40.03
+Figure 4.
+GPU memory efficiency comparison between DeiT-
+Ti [60] and our Vim-Ti on the commonly used downstream frame-
+work. We perform batch inference and benchmark the GPU mem-
+ory on the architecture with the backbone and FPN. Vim requires
+comparable GPU memory to DeiT with a small resolution, i.e.,
+512. As the input image resolution increases, Vim will use signif-
+icantly less GPU memory.
+Bidirectional strategy
+ImageNet
+top-1 acc.
+ADE20K
+mIoU
+None
+73.2
+32.3
+Bidirectional Layer
+70.9
+33.6
+Bidirectional SSM
+72.8
+33.2
+Bidirectional SSM + Conv1d
+73.1
+34.8
+Table 4. Ablation study on the bidirectional design. Default setting
+for Vim is marked in blue .
+We want to highlight that the accuracy superiority is non-
+trivial since DeiT is equipped with window attention while
+Vim works in a pure sequence modeling manner. Specifi-
+cally, to perform representation learning on high-resolution
+images (i.e., 1024×1024), we follow ViTDet [38] and mod-
+ify DeiT backbone with the use of 2D window attention,
+which injects 2D prior and breaks the sequential modeling
+nature of Transformer. Thanks to the efficiency illustrated
+in Sec. 3.5, Fig. 1 and Fig. 4, we can directly apply Vim on
+1024×1024 input images and learn sequential visual rep-
+resentation for object detection and instance segmentation
+without need for 2D priors in the backbone.
+4.4. Ablation Study
+We ablate the key bidirectional design of Vim,
+us-
+ing ImageNet-1K classification and Segmenter [54] on
+ADE20K semantic segmentation.
+To fully evaluate the
+power of learned representation on ImageNet, we use a sim-
+ple Segmenter head with only 2 layers to perform transfer
+learning on semantic segmentation. We study these bidirec-
+tional strategies:
+• None. We directly adopt Mamba block to process visual
+sequence with only the forward direction.
+
+
+--- End of Page ---
+
+
+GT
+DeiT-T
+Figure 5. Visualization comparison of DeiT-Ti [61] and our Vim-Ti on th
+context learning of SSM, we can capture the very large object in the im
+• Bidirectional Sequence. During training, we randomly
+flip the visual sequence. This works like data augmenta-
+tion.
+• Bidirectional Block. We pair the stacked blocks. The
+first block of each pair processes visual sequence in the
+forward direction, and the second block of each pair pro-
+cesses in the backward direction.
+• Bidirectional SSM. We add an extra SSM for each block
+to process the visual sequence in the backward direction.
+• Bidirectional SSM + Conv1d.
+Based on Bidirectional
+SSM, we further add a backward Conv1d before the back-
+ward SSM (Fig. 2).
+As shown in Tab. 4, directly adopting Mamba block
+achieves good performance in classification. However, the
+unnatural unidirectional manner poses challenges in down-
+stream dense prediction. Specifically, the preliminary bidi-
+rectional strategy of using Bidirectional Block achieves 7
+points lower top-1 accuracy on classification. Yet, it out-
+performs the vanilla unidirectional Mamba block by 1.3
+mIoU on semantic segmentation. By adding extra back-
+ward SSM and Conv1d, we achieve similar classification
+accuracy (73.1 top-1 acc vs. 73.2 top-1 acc) and exceptional
+segmentation superiority (34.8 mIoU vs. 32.3 mIoU). We
+use the strategy of Bidirectional SSM + Conv1d as the de-
+fault setting in our Vim block.
+5. Conclusion and Future Work
+We have proposed Vision Mamba (Vim) to explore the
+very recent efficient state space model, i.e., Mamba, as
+generic vision backbones. Unlike prior state space mod-
+els for vision tasks which use hybrid architecture or equiva-
+lent global 2D convolutional kernel, Vim learns visual rep-
+resentation in the sequence modeling manner and does not
+introduce image-specific inductive biases. Thanks to the
+proposed bidirectional state space modeling, Vim achieves
+data-dependent global visual context and enjoys the same
+modeling power as Transformer, while having lower com-
+putation complexity. Benefiting from the hardware-aware
+designs of Mamba, the inference speed and memory us-
+8
+
+Vim-Ti
+Ti
+he Cascade Mask R-CNN [4] framework. Thanks to the long-range
+age, which the DeiT-Ti counterpart fails to perceive.
+age of Vim are significantly better than ViTs when pro-
+cessing high-resolution images. Experiment results on stan-
+dard computer vision benchmarks have verified the model-
+ing power and high efficiency of Vim, showing that Vim has
+great potential to be the next-generation vision backbone.
+In future works, Vim with the bidirectional SSM model-
+ing with position embeddings is suitable for unsupervised
+tasks such as mask image modeling pretraining and the
+similar architecture with Mamba enables multimodal tasks
+such as CLIP-style pretraining.
+Based on the pretrained
+Vim weights, exploring the usefulness of Vim for analyz-
+ing high-resolution medical images, remote sensing images,
+and long videos, which can be regarded as downstream
+tasks, is very straightforward.
+Acknowledgement
+We would like to acknowledge Tianheng Cheng, Yuxin
+Fang, Shusheng Yang, Bo Jiang, and Jingfeng Yao for their
+helpful feedback on the draft.
+References
+[1] Hangbo Bao, Li Dong, Songhao Piao, and Furu Wei. Beit:
+BERT pre-training of image transformers. In ICLR, 2022. 3
+[2] Ethan Baron, Itamar Zimerman, and Lior Wolf. 2-d ssm: A
+general spatial layer for visual transformers. arXiv preprint
+arXiv:2306.06635, 2023. 2
+[3] Rohan Bavishi, Erich Elsen, Curtis Hawthorne, Maxwell
+Nye, Augustus Odena, Arushi Somani, and Sa˘gnak Tas¸ırlar.
+Introducing our multimodal models, 2023. 2, 3
+[4] Zhaowei Cai and Nuno Vasconcelos. Cascade r-cnn: High
+quality object detection and instance segmentation. TPAMI,
+2019. 7, 8
+[5] Mathilde Caron, Hugo Touvron, Ishan Misra, Herv´e J´egou,
+Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerg-
+ing properties in self-supervised vision transformers.
+In
+ICCV, 2021. 3
+[6] Liang-Chieh Chen, Yukun Zhu, George Papandreou, Florian
+Schroff, and Hartwig Adam. Encoder-decoder with atrous
+separable convolution for semantic image segmentation. In
+ECCV, 2018. 6
+
+
+--- End of Page ---
+
+[7] Rewon Child, Scott Gray, Alec Radford, and Ilya Sutskever.
+Generating long sequences with sparse transformers. arXiv
+preprint arXiv:1904 10509 2019 3
+[22] Albert Gu, Isys Johnson, Karan Goel, Khaled Saab, Tri
+Dao, Atri Rudra, and Christopher R´e. Combining recurrent,
+convolutional and continuous time models with linear state
+
+preprint arXiv:1904.10509, 2019. 3
+[8] Krzysztof Marcin Choromanski,
+Valerii Likhosherstov,
+David Dohan, Xingyou Song, Andreea Gane, Tamas Sar-
+los, Peter Hawkins, Jared Quincy Davis, Afroz Mohiuddin,
+Lukasz Kaiser, David Benjamin Belanger, Lucy J Colwell,
+and Adrian Weller. Rethinking attention with performers. In
+ICLR, 2021. 3
+[9] Zihang Dai, Hanxiao Liu, Quoc V Le, and Mingxing Tan.
+Coatnet: Marrying convolution and attention for all data
+sizes. NeurIPS, 34, 2021. 3
+[10] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+and Li Fei-Fei. Imagenet: A large-scale hierarchical image
+database. In CVPR, 2009. 1, 3, 5
+[11] Jiayu Ding, Shuming Ma, Li Dong, Xingxing Zhang, Shao-
+han Huang, Wenhui Wang, Nanning Zheng, and Furu Wei.
+Longnet:
+Scaling transformers to 1,000,000,000 tokens.
+arXiv preprint arXiv:2307.02486, 2023. 3
+[12] Xiaohan Ding, Xiangyu Zhang, Jungong Han, and Guiguang
+Ding. Scaling up your kernels to 31x31: Revisiting large
+kernel design in cnns. In CVPR, 2022. 3
+[13] Xiaoyi Dong, Jianmin Bao, Dongdong Chen, Weiming
+Zhang, Nenghai Yu, Lu Yuan, Dong Chen, and Baining Guo.
+Cswin transformer: A general vision transformer backbone
+with cross-shaped windows. In CVPR, 2022. 3
+[14] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+vain Gelly, et al. An image is worth 16x16 words: Trans-
+formers for image recognition at scale. In ICLR, 2020. 2, 4,
+6
+[15] St´ephane d’Ascoli, Hugo Touvron, Matthew L Leavitt, Ari S
+Morcos, Giulio Biroli, and Levent Sagun. Convit: Improving
+vision transformers with soft convolutional inductive biases.
+In ICML, 2021. 3
+[16] Jiemin Fang, Lingxi Xie, Xinggang Wang, Xiaopeng Zhang,
+Wenyu Liu, and Qi Tian. Msg-transformer: Exchanging lo-
+cal spatial information by manipulating messenger tokens. In
+CVPR, 2022. 3
+[17] Yuxin Fang, Wen Wang, Binhui Xie, Quan Sun, Ledell Wu,
+Xinggang Wang, Tiejun Huang, Xinlong Wang, and Yue
+Cao. Eva: Exploring the limits of masked visual representa-
+tion learning at scale. In CVPR, 2023. 3
+[18] Daniel Y Fu, Tri Dao, Khaled Kamal Saab, Armin W
+Thomas, Atri Rudra, and Christopher Re. Hungry hungry
+hippos: Towards language modeling with state space mod-
+els. In ICLR, 2023. 3
+[19] Golnaz Ghiasi, Yin Cui, Aravind Srinivas, Rui Qian, Tsung-
+Yi Lin, Ekin D Cubuk, Quoc V Le, and Barret Zoph. Simple
+copy-paste is a strong data augmentation method for instance
+segmentation. In CVPR, 2021. 7
+[20] Albert Gu and Tri Dao.
+Mamba: Linear-time sequence
+modeling with selective state spaces.
+arXiv preprint
+arXiv:2312.00752, 2023. 2, 3
+[21] Albert Gu, Karan Goel, and Christopher R´e.
+Efficiently
+modeling long sequences with structured state spaces. arXiv
+preprint arXiv:2111.00396, 2021. 1, 3
+9
+
+convolutional, and continuous-time models with linear state
+space layers. In NeurIPS, 2021. 1
+[23] Albert Gu, Karan Goel, Ankit Gupta, and Christopher R´e.
+On the parameterization and initialization of diagonal state
+space models. In NeurIPS, 2022. 2
+[24] Ankit Gupta, Albert Gu, and Jonathan Berant. Diagonal state
+spaces are as effective as structured state spaces. In NeurIPS,
+2022. 1
+[25] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition.
+In CVPR,
+2016. 2, 6
+[26] Gao Huang, Zhuang Liu, Laurens Van Der Maaten, and Kil-
+ian Q Weinberger.
+Densely connected convolutional net-
+works. In CVPR, 2017. 2
+[27] Md Mohaiminul Islam and Gedas Bertasius. Long movie
+clip classification with state-space video models. In ECCV,
+2022. 3
+[28] Md Mohaiminul Islam, Mahmudul Hasan, Kishan Shamsun-
+dar Athrey, Tony Braskich, and Gedas Bertasius. Efficient
+movie scene detection using state-space transformers.
+In
+CVPR, 2023. 3
+[29] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh,
+Hieu Pham, Quoc Le, Yun-Hsuan Sung, Zhen Li, and Tom
+Duerig. Scaling up visual and vision-language representation
+learning with noisy text supervision. In ICML, 2021. 3
+[30] Rudolph Emil Kalman. A new approach to linear filtering
+and prediction problems. 1960. 1
+[31] Jacob Devlin Ming-Wei Chang Kenton and Lee Kristina
+Toutanova. Bert: Pre-training of deep bidirectional trans-
+formers for language understanding. In NAACL-HLT, 2019.
+4
+[32] Nikita Kitaev, Lukasz Kaiser, and Anselm Levskaya. Re-
+former: The efficient transformer. In ICLR, 2020. 3
+[33] Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hinton.
+Imagenet classification with deep convolutional neural net-
+works. In NeurIPS, 2012. 2
+[34] Yann LeCun, L´eon Bottou, Yoshua Bengio, and Patrick
+Haffner. Gradient-based learning applied to document recog-
+nition. Proceedings of the IEEE, 86(11):2278–2324, 1998.
+2
+[35] Junnan Li, Dongxu Li, Caiming Xiong, and Steven Hoi.
+Blip: Bootstrapping language-image pre-training for unified
+vision-language understanding and generation.
+In ICML,
+2022. 3
+[36] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+Blip-2:
+Bootstrapping language-image pre-training with
+frozen image encoders and large language models.
+arXiv
+preprint arXiv:2301.12597, 2023. 2, 3
+[37] Yuhong Li, Tianle Cai, Yi Zhang, Deming Chen, and De-
+badeepta Dey. What makes convolutional models great on
+long sequence modeling? In ICLR, 2022. 2
+[38] Yanghao Li, Hanzi Mao, Ross Girshick, and Kaiming He.
+Exploring plain vision transformer backbones for object de-
+tection. In ECCV, 2022. 2, 7
+
+
+--- End of Page ---
+
+[39] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+Zitnick
+Microsoft coco: Common objects in context
+In
+network: A successor to transformer for large language mod-
+elss. arXiv preprint arXiv:2307.08621, 2023. 3
+[56] Ch i ti
+S
+d
+W i Li
+Y
+i
+Ji
+Pi
+S
+t
+
+Zitnick. Microsoft coco: Common objects in context. In
+ECCV, 2014. 3, 6
+[40] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+Visual instruction tuning. arXiv preprint arXiv:2304.08485,
+2023. 2, 3
+[41] Shiwei Liu, Tianlong Chen, Xiaohan Chen, Xuxi Chen, Qiao
+Xiao, Boqian Wu, Tommi K¨arkk¨ainen, Mykola Pechenizkiy,
+Decebal Mocanu, and Zhangyang Wang. More convnets in
+the 2020s: Scaling up kernels beyond 51x51 using sparsity.
+arXiv preprint arXiv:2207.03620, 2022. 3
+[42] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng
+Zhang, Stephen Lin, and Baining Guo. Swin transformer:
+Hierarchical vision transformer using shifted windows. In
+ICCV, 2021. 3
+[43] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feicht-
+enhofer, Trevor Darrell, and Saining Xie. A convnet for the
+2020s. In CVPR, 2022. 3
+[44] Ilya Loshchilov and Frank Hutter. Decoupled weight decay
+regularization. In ICLR, 2019. 5
+[45] Jun Ma, Feifei Li, and Bo Wang.
+U-mamba: Enhancing
+long-range dependency for biomedical image segmentation.
+arXiv preprint arXiv:2401.04722, 2024. 3
+[46] Harsh Mehta, Ankit Gupta, Ashok Cutkosky, and Behnam
+Neyshabur. Long range language modeling via gated state
+spaces. In ICLR, 2023. 3
+[47] Eric Nguyen, Karan Goel, Albert Gu, Gordon Downs, Preey
+Shah, Tri Dao, Stephen Baccus, and Christopher R´e. S4nd:
+Modeling images and videos as multidimensional signals
+with state spaces. In NeurIPS, 2022. 3, 6
+[48] Zhen Qin, Songlin Yang, and Yiran Zhong. Hierarchically
+gated recurrent neural network for sequence modeling. In
+NeurIPS, 2023. 3
+[49] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-
+ing transferable visual models from natural language super-
+vision. In ICML, 2021. 3
+[50] Ilija Radosavovic, Raj Prateek Kosaraju, Ross Girshick,
+Kaiming He, and Piotr Doll´ar. Designing network design
+spaces. In CVPR, 2020. 2, 6
+[51] Karen Simonyan and Andrew Zisserman. Very deep convo-
+lutional networks for large-scale image recognition. arXiv
+preprint arXiv:1409.1556, 2014. 2
+[52] Jimmy TH Smith, Shalini De Mello, Jan Kautz, Scott Linder-
+man, and Wonmin Byeon. Convolutional state space models
+for long-range spatiotemporal modeling. In NeurIPS, 2023.
+2
+[53] Jimmy T.H. Smith, Andrew Warrington, and Scott Linder-
+man. Simplified state space layers for sequence modeling.
+In ICLR, 2023. 3
+[54] Robin Strudel, Ricardo Garcia, Ivan Laptev, and Cordelia
+Schmid. Segmenter: Transformer for semantic segmenta-
+tion. In ICCV, 2021. 7
+[55] Yutao Sun, Li Dong, Shaohan Huang, Shuming Ma, Yuqing
+Xia, Jilong Xue, Jianyong Wang, and Furu Wei. Retentive
+10
+
+[56] Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
+Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent
+Vanhoucke, and Andrew Rabinovich.
+Going deeper with
+convolutions. In CVPR, 2015. 2
+[57] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model
+scaling for convolutional neural networks. In ICML, 2019.
+[58] Mingxing Tan and Quoc Le. Efficientnetv2: Smaller models
+and faster training. In ICML, 2021. 2
+[59] Ilya O Tolstikhin, Neil Houlsby, Alexander Kolesnikov, Lu-
+cas Beyer, Xiaohua Zhai, Thomas Unterthiner, Jessica Yung,
+Andreas Steiner, Daniel Keysers, Jakob Uszkoreit, et al.
+Mlp-mixer: An all-mlp architecture for vision. In NeurIPS,
+2021. 3
+[60] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco
+Massa, Alexandre Sablayrolles, and Herv´e J´egou. Training
+data-efficient image transformers & distillation through at-
+tention. In ICML, 2021. 1, 2, 7
+[61] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco
+Massa, Alexandre Sablayrolles, and Herv´e J´egou. Training
+data-efficient image transformers & distillation through at-
+tention. In ICML, 2021. 3, 4, 5, 6, 8
+[62] Hugo Touvron, Piotr Bojanowski, Mathilde Caron, Matthieu
+Cord, Alaaeldin El-Nouby, Edouard Grave, Gautier Izac-
+ard, Armand Joulin, Gabriel Synnaeve, Jakob Verbeek, et al.
+Resmlp: Feedforward networks for image classification with
+data-efficient training. TPAMI, 2022. 3
+[63] Jingdong Wang, Ke Sun, Tianheng Cheng, Borui Jiang,
+Chaorui Deng, Yang Zhao, Dong Liu, Yadong Mu, Mingkui
+Tan, Xinggang Wang, et al. Deep high-resolution represen-
+tation learning for visual recognition. TPAMI, 2020. 2
+[64] Jue Wang, Wentao Zhu, Pichao Wang, Xiang Yu, Linda Liu,
+Mohamed Omar, and Raffay Hamid.
+Selective structured
+state-spaces for long-form video understanding. In CVPR,
+2023. 3
+[65] Sinong Wang, Belinda Z Li, Madian Khabsa, Han Fang, and
+Hao Ma. Linformer: Self-attention with linear complexity.
+arXiv preprint arXiv:2006.04768, 2020. 3
+[66] Wenhai Wang, Enze Xie, Xiang Li, Deng-Ping Fan, Kaitao
+Song, Ding Liang, Tong Lu, Ping Luo, and Ling Shao. Pyra-
+mid vision transformer: A versatile backbone for dense pre-
+diction without convolutions. In ICCV, 2021. 3
+[67] Wenhai Wang, Jifeng Dai, Zhe Chen, Zhenhang Huang,
+Zhiqi Li, Xizhou Zhu, Xiaowei Hu, Tong Lu, Lewei Lu,
+Hongsheng Li, et al. Internimage: Exploring large-scale vi-
+sion foundation models with deformable convolutions. In
+CVPR, 2023. 3
+[68] Wenhui Wang, Shuming Ma, Hanwen Xu, Naoto Usuyama,
+Jiayu Ding, Hoifung Poon, and Furu Wei. When an image is
+worth 1,024 x 1,024 words: A case study in computational
+pathology. arXiv preprint arXiv:2312.03558, 2023. 3
+[69] Haiping Wu, Bin Xiao, Noel Codella, Mengchen Liu,
+Xiyang Dai, Lu Yuan, and Lei Zhang. Cvt: Introducing con-
+volutions to vision transformers. In ICCV, 2021. 3
+[70] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and
+Jian Sun. Unified perceptual parsing for scene understand-
+ing. In ECCV, 2018. 6
+
+
+--- End of Page ---
+
+[71] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and
+Jian Sun. Unified perceptual parsing for scene understand-
+ing In ECCV 2018 6
+
+ing. In ECCV, 2018. 6
+[72] Saining Xie, Ross Girshick, Piotr Doll´ar, Zhuowen Tu, and
+Kaiming He. Aggregated residual transformations for deep
+neural networks. In CVPR, 2017. 2, 6
+[73] Jing Nathan Yan, Jiatao Gu, and Alexander M Rush.
+Diffusion models without attention.
+arXiv preprint
+arXiv:2311.18257, 2023. 3
+[74] Bolei Zhou, Hang Zhao, Xavier Puig, Tete Xiao, Sanja Fi-
+dler, Adela Barriuso, and Antonio Torralba. Semantic under-
+standing of scenes through the ade20k dataset. IJCV, 2019.
+3, 6
+11
+
+
+
+--- End of Page ---
+

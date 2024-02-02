@@ -1,0 +1,1058 @@
+Policy Gradient Method For Robust Reinforcement Learning
+Yue Wang 1 Shaofeng Zou 1
+Abstract
+This paper develops the first policy gradient
+method with global optimality guarantee and complexity analysis for robust reinforcement learning
+under model mismatch. Robust reinforcement
+learning is to learn a policy robust to model mismatch between simulator and real environment.
+We first develop the robust policy (sub-)gradient,
+which is applicable for any differentiable parametric policy class. We show that the proposed robust
+policy gradient method converges to the global
+optimum asymptotically under direct policy parameterization. We further develop a smoothed
+robust policy gradient method, and show that to
+achieve an -global optimum, the complexity is
+O(
+−3
+). We then extend our methodology to the
+general model-free setting, and design the robust
+actor-critic method with differentiable parametric policy class and value function. We further
+characterize its asymptotic convergence and sample complexity under the tabular setting. Finally,
+we provide simulation results to demonstrate the
+robustness of our methods.
+1. Introduction
+In practical reinforcement learning (RL) (Sutton & Barto,
+2018) applications, the training environment may often
+times deviate from the test environment, resulting in a model
+mismatch between the two. Such model mismatch could be
+because of, e.g., modeling error between simulator and realworld applications, model deviation due to non-stationarity
+of the environment, unexpected perturbation and potential
+adversarial attacks. This may lead to a significant performance degradation in the testing environment.
+To solve the issue of model mismatch, a framework of robust
+Markov decision process (MDP) was introduced in (Bag1Department of Electrical Engineering, University at Buffalo, New York, USA. Correspondence to: Shaofeng Zou
+<szou3@buffalo.edu>.
+Proceedings of the 39 th International Conference on Machine
+Learning, Baltimore, Maryland, USA, PMLR 162, 2022. Copyright 2022 by the author(s).
+nell et al., 2001; Nilim & El Ghaoui, 2004; Iyengar, 2005),
+where the MDP model is not fixed but comes from some
+uncertainty set. The goal of robust RL is to find a policy
+that optimize the worst-case performance over all possible
+MDP models in the uncertainty set. Value-based approaches
+have been extensively studied under the tabular setting and
+with function approximation, e.g., (Iyengar, 2005; Nilim
+& El Ghaoui, 2004; Badrinath & Kalathil, 2021; Wiesemann et al., 2013; Roy et al., 2017; Tamar et al., 2014; Lim
+et al., 2013; Bagnell et al., 2001; Satia & Lave Jr, 1973;
+Xu & Mannor, 2010; Wang & Zou, 2021). There are also
+other approaches that are shown to be successful empirically, e.g., based on adversarial training, (Vinitsky et al.,
+2020; Pinto et al., 2017; Abdullah et al., 2019; Hou et al.,
+2020; Rajeswaran et al., 2017; Atkeson & Morimoto, 2003;
+Morimoto & Doya, 2005; Huang et al., 2017; Kos & Song,
+2017; Lin et al., 2017; Pattanaik et al., 2018; Mandlekar
+et al., 2017), which however lack theoretical robustness and
+optimality guarantee.
+The policy gradient method (Williams, 1992; Sutton et al.,
+1999; Konda & Tsitsiklis, 2000; Kakade, 2001), which models and optimizes the policy directly, has been widely used
+in RL thanks to its ease of implementation in model-free setting, scalability to large/continuous state and action spaces,
+and applicability to any differentiable policy parameterization. Despite a large body of empirical and theoretical
+work on policy gradient method, development of policy
+gradient approach for robust RL with provable robustness
+to model mismatch and optimality guarantee still remains
+largely open in the literature.
+In this paper, we develop the first policy gradient method
+for robust RL under model mismatch with provable robustness, global optimality and complexity analysis. In this
+paper, we focus on the R-contamination uncertainty set
+model (Huber, 1965; Du et al., 2018; Huber & Ronchetti,
+2009; Wang & Zou, 2021; Nishimura & Ozaki, 2004; Prasad
+et al., 2020a;b). Our robust policy gradient method inherits
+advantages of vanilla policy gradient methods and their variants, and provide provable guarantee on global optimality
+and robustness. In particular, the challenges and our major
+contributions are summarized as follows.
+• Robust RL aims to optimize the worst-case performance,
+named robust value function, where the worst-case is
+arXiv:2205.07344v1 [cs.LG] 15 May 2022
+Policy Gradient Method For Robust Reinforcement Learning
+taken over some uncertainty set of MDPs. However, the
+robust value function involves a “max” and thus may not
+be differentiable in the policy. Our first contribution in
+this paper is the development of robust policy gradient,
+where we derive the Frechet sub-gradient of the robust ´
+value function, and further show that it is the gradient
+almost everywhere. We would like to highlight that our
+robust policy gradient applies to any differentiable and
+Lipschitz policy class.
+• Motivated by recent advancements on the global optimality of vanilla policy gradient methods, we are interested
+in a natural question that whether the global optimum of
+robust RL can be attained by our robust policy gradient
+method. The major challenge lies in that the robust value
+function involves a “max” over the uncertainty set, and
+thus has a much more complicated landscape than the
+vanilla value function. We consider the direct parametric policy class and show that the robust value function
+satisfies the Polyak-Łojasiewicz (PL) condition (Polyak,
+1963; Lojasiewicz, 1963), and our robust policy gradient
+method converges to a global optimum almost surely.
+• The robust value function may not be differentiable everywhere, which is the major challenge in the convergence
+rate analysis. We then design a smoothed robust policy
+gradient method as an approximation, where the corresponding smoothed objective function is differentiable.
+We show that smoothed robust policy gradient method
+converges to an -global optimum of the original nondifferentiable robust RL problem with a complexity of
+O(
+−3
+).
+• To understand the fundamentals of our robust policy gradient method, our results discussed so far focus on the ideal
+setting assuming perfect knowledge of the (smoothed)
+robust policy gradient. Although this is a commonly used
+setting in recent studies of vanilla policy gradient, e.g.,
+(Agarwal et al., 2021; Cen et al., 2021; Mei et al., 2020;
+Bhandari & Russo, 2019), such knowledge is typically unknown in practice and need to be estimated from samples.
+We then focus on the model-free setting, where only samples from the centroid of the uncertainty set are available,
+and we design a model-free robust actor-critic algorithm.
+Our robust actor-critic can be applied with arbitrary differential parametric policy class and value function approximation in practice. Theoretically, we prove the global
+optimality of our robust actor critic method under the
+tabular setting with direct parametric policy class.
+1.1. Related Works
+Global optimality of vanilla policy gradient method. In
+the non-robust setting, policy gradient methods (Williams,
+1992; Sutton et al., 1999) as well as their extensions (Sutton
+et al., 1999; Konda & Tsitsiklis, 2000; Kakade, 2001; Schulman et al., 2015; 2017) have been successful in various
+applications, e.g., (Schulman et al., 2015; 2017). Despite
+the surge of interest in policy gradient methods, theoretical
+understanding remains limited to convergence to local optimum and stationary points. It was not until recently that
+the global optimality of various policy gradient methods
+was established (Bhandari & Russo, 2021; 2019; Agarwal
+et al., 2021; Mei et al., 2020; Li et al., 2021; Laroche & des
+Combes, 2021; Zhang et al., 2021a; Cen et al., 2021; Zhang
+et al., 2020a; Lin, 2022). In this paper, we focus on policy
+gradient methods for robust RL. The major new challenge
+lies in that the robust value function is not differentiable
+everywhere, and the landscape of the robust value function
+is much more complicated than the vanilla value function.
+Value-based approach for robust RL. Robust MDP
+was introduced and studied in (Iyengar, 2005; Nilim &
+El Ghaoui, 2004; Bagnell et al., 2001; Satia & Lave Jr,
+1973; Wiesemann et al., 2013; Lim & Autef, 2019; Xu &
+Mannor, 2010; Yu & Xu, 2015; Lim et al., 2013; Tamar
+et al., 2014), where the uncertainty set is assumed to be
+known to the learner, and the problem can be solved using
+dynamic programming. Later, the studies were generalized
+to the model-free setting where stochastic samples from the
+central MDP of the uncertainty set are available in an online
+fashion (Roy et al., 2017; Badrinath & Kalathil, 2021; Wang
+& Zou, 2021; Tessler et al., 2019) and an offline fashion
+(Zhou et al., 2021; Yang et al., 2021; Panaganti & Kalathil,
+2021; Goyal & Grand-Clement, 2018; Kaufman & Schaefer, 2013; Ho et al., 2018; 2021; Si et al., 2020). In this
+paper, we focus on approaches that model and optimize the
+policy directly, and develop robust policy gradient method.
+Our method inherits advantages of policy gradient, and has
+a broader applicability than value-based method for largescale problems.
+Direct policy search for robust RL. Robust policy gradient method for constrained MDP was studied in (Russel
+et al., 2020), however, there are mistakes in the gradient
+derivation. More specifically, the fact that the worst-case
+transition kernel is a function of the policy was ignored
+when deriving the gradient. A recent paper (Derman et al.,
+2021) showed the equivalence between robust MDP and
+regularized MDP, and developed a policy gradient method
+for the case with only reward uncertainty. In (Derman et al.,
+2021), it was discussed that it is difficult to their methods
+extend to problems with uncertain transition kernel because
+of the dependency between the worst-case transition kernel
+and the policy. (Eysenbach & Levine, 2021) showed a similar result that maximum entropy regularized MDP is robust
+to model mismatch. In this paper, we focus on the challenging problem with uncertain transition kernel, and derive the
+robust policy gradient. We also note that a separate line of
+work (Zhang et al., 2021c;b) studies the corruption-robust
+Policy Gradient Method For Robust Reinforcement Learning
+RL problems, where the goal is to learn a robust policy to
+data corruption, and is fundamentally different from the
+problem in this paper.
+2. Preliminaries
+Markov Decision Process. An MDP (S, A, P, c, γ) is specified by: a state space S, an action space A, a transition
+kernel P = {p
+a
+s ∈ ∆(S), a ∈ A, s ∈ S}
+1
+, where p
+a
+s
+is the
+distribution of the next state over S upon the agent taking
+action a in state s, a cost function c : S × A → [0, 1], and
+a discount factor γ ∈ [0, 1). At each time step t, the agent
+in state st takes an action at. The environment then transits
+to the next state st+1 according to the distribution p
+at
+st
+, and
+provides a cost signal c(st, at) ∈ [0, 1] to the agent.
+A stationary policy π : S → ∆(A) maps any state to a
+distribution over the action space A. More specifically, in
+state s, the agent takes action a with probability π(a|s). The
+value function of a stationary policy π starting from s ∈
+S measures the expected accumulated discounted cost by
+following policy π: E [
+P∞
+t=0 γ
+t
+c(St, At)|S0 = s, π], and
+the goal is to find a policy that minimizes the value function
+for any initial state s ∈ S.
+Robust MDP. The transition kernel of the robust MDP is
+not fixed but is from some uncertainty set P. In this paper,
+we focus on the (s, a)-rectangular uncertainty set (Nilim &
+El Ghaoui, 2004; Iyengar, 2005), i.e., P =
+N
+s,a P
+a
+s
+, where
+P
+a
+s ⊆ ∆(S). At each time step, after the agent takes an
+action, the environment transits to the next state following
+any transition kernel P ∈ P, and the choice of kernels
+can be time-varying. A sequence of transition kernel κ =
+(P0, P1...) ∈
+N
+t≥0 P can be viewed as a policy chosen by
+the nature and is referred to as the nature’s policy.
+The robust value function of a policy π is defined as the
+worst-case expected accumulated discounted cost over κ
+when following π and starting from s:
+V
+π
+(s) , max
+κ∈
+N
+t≥0 P
+Eκ
+"X∞
+t=0
+γ
+t
+c(St, At)|S0 = s, π#
+. (1)
+The robust action-value function can be defined: Qπ
+(s, a) ,
+maxκ∈
+N
+t≥0 P Eκ [
+P∞
+t=0 γ
+t
+c(St, At)|S0 = s, A0 = a, π] .
+It has been shown that V
+π
+(s) = P
+a∈A π(a|s)Qπ
+(s, a)
+(Nilim & El Ghaoui, 2004; Iyengar, 2005).
+The robust Bellman operator of a policy π is defined as
+TπV (s) ,
+X
+a∈A
+π(a|s)
+
+c(s, a) + γσPa
+s
+(V )
+
+, (2)
+where σPa
+s
+(V ) , maxp∈Pa
+s
+p
+>V is the support function of
+V on P
+a
+s
+. Tπ is a contraction and V
+π
+is the unique fixed
+1∆(S) denotes the (|S| − 1)-dimensional probability simplex
+on S.
+point (Nilim & El Ghaoui, 2004; Iyengar, 2005; Puterman,
+2014).
+Define the expected worst-case total cost function under the
+initial distribution ρ as Jρ(π) , ES∼ρ[V
+π
+(S)]. The goal of
+the agent is to find an optimal policy that minimizes Jρ(π):
+minπ Jρ(π).
+R-Contamination Uncertainty Set. In this paper, we
+focus on an adversarial model of the uncertainty set, Rcontamination, where the nature could arbitrarily perturb
+the state transition of the MDP with a small probability.
+Let P =
+N
+s∈S,a∈A p
+a
+s be a transition kernel. The Rcontamination uncertainty set centered at P is defined as
+P ,
+N
+s,a P
+a
+s
+, where
+P
+a
+s , {(1 − R)p
+a
+s + Rq|q ∈ ∆(S)} , s ∈ S, a ∈ A. (3)
+This uncertainty set model is widely used in the literature
+of robust learning and optimization, e.g., (Huber, 1965; Du
+et al., 2018; Wang & Zou, 2021; Huber & Ronchetti, 2009;
+Nishimura & Ozaki, 2004; 2006; Prasad et al., 2020a;b).
+The R-contamination set models the scenario where the
+state transition could be arbitrarily perturbed with a small
+probability R, hence is more suitable for systems suffering
+from random perturbations, adversarial attacks, and outliers
+in sampling. R-contamination set can also be connected to
+uncertainty sets defined by total variation, KL-divergence
+and Hellinger distance via inequalities, e.g., Pinsker’s inequality. On the other hand, the R-contamination model is
+more clean and straightforward, which makes the derivation of the robust policy gradient, and the convergence and
+complexity analyses tractable.
+Under the R-contamination model, the support function can
+be easily computed as follows:
+σPa
+s
+(V ) = (1 − R)
+X
+s
+0∈S
+p
+a
+s,s0V (s
+0
+) + R max
+s
+0
+V (s
+0
+), (4)
+where p
+a
+s,s0 = p
+a
+s
+(s
+0
+).
+3. Robust Policy Gradient
+Consider a parametric policy class ΠΘ = {πθ : θ ∈ Θ}.
+Denote Jρ(πθ) by Jρ(θ). Robust RL aims to find an optimal
+policy πθ
+∗ ∈ ΠΘ that minimizes the expected worst-case
+accumulated discounted cost:
+θ
+∗ ∈ arg min
+θ∈Θ
+Jρ(θ). (5)
+Let J
+∗
+ρ
+, minθ∈Θ Jρ(θ). Recall the definition of V
+π
+(s) in
+(1). Due to the max over κ, V
+π
+(s) may not be differentiable.
+To solve this issue, we adopt the Frechet sub-differential ´
+(Kruger, 2003)
+Policy Gradient Method For Robust Reinforcement Learning
+Definition 3.1. For a function f : X ⊆ R
+N → R, a vector
+u ∈ R
+N is called a Frechet sub-differential of ´ f at x, if
+lim
+h→0
+inf
+h6=0
+f(x + h) − f(x) − hh, ui
+khk
+≥ 0. (6)
+The set of all the sub-differential of f at x is denoted by
+∂f(x).
+Clearly, when f(x) is differentiable at x, ∂f(x) =
+{∇f(x)}.
+Without loss of generality, we assume that the parametric
+policy class is differentiable and Lipschitz.
+Assumption 3.2. The policy class ΠΘ is differentiable and
+kπ-Lipschitz, i.e., for any s ∈ S, a ∈ A and θ ∈ Θ, there
+exists a universal constant kπ, such that k∇πθ(a|s)k ≤ kπ.
+This assumption can be easily satisfied by many policy
+classes, e.g., direct parameterization (Agarwal et al., 2021),
+soft-max (Mei et al., 2020; Li et al., 2021; Zhang et al.,
+2021a; Wang & Zou, 2020), or neural network with Lipschitz and smooth activation functions (Du et al., 2019;
+Neyshabur, 2017; Miyato et al., 2018).
+Define the discounted visitation distribution as d
+π
+s
+(s
+0
+) ,
+(1−γ +γR)
+P∞
+t=0 γ
+t
+(1−R)
+t
+·P(St = s
+0
+|S0 = s, π), and
+let d
+π
+ρ
+(s
+0
+) = ES∼ρ[d
+π
+S
+(s
+0
+)]. Denote sθ , arg maxs V
+πθ (s).
+Then, the (sub-)gradient of Jρ(θ) can be computed in the
+following theorem.
+Theorem 3.3. (Robust Policy Gradient) Consider a class of
+policies ΠΘ satisfying Assumption 3.2. For any distribution
+ρ, denote
+ψρ(θ) ,
+γR
+(1 − γ)(1 − γ + γR)
+X
+s∈S
+d
+πθ
+sθ
+(s)
+X
+a∈A
+∇πθ(a|s)Q
+πθ
+(s, a)
++
+1
+1 − γ + γR
+X
+s∈S
+d
+πθ
+ρ
+(s)
+X
+a∈A
+∇πθ(a|s)Q
+πθ
+(s, a), (7)
+Then, (1) almost everywhere in Θ, Jρ(θ) is differentiable
+and ψρ(θ) = ∇Jρ(θ); and (2) at non-differentiable θ,
+ψρ(θ) ∈ ∂Jρ(θ).
+If we set R = 0, i.e., the uncertainty set P reduces to a
+singleton {P} and there is no robustness, then ψρ(θ) in (7)
+reduces to the vanilla policy gradient (Sutton et al., 1999).
+As can be seen from (7), the robust policy (sub)-gradient is
+a function of the robust Q-function. Note that in robust RL,
+Jρ(θ) may not be differentiable everywhere, and therefore,
+the sub-gradient is needed. The mistake in (Russel et al.,
+2020) is due to the ignorance of the dependence of the
+worst-case kernel on θ, and their robust policy gradient is a
+function of the vanilla Q-function not the robust Q-function,
+which should not be the case.
+In policy gradient approaches, the agent often has the challenge of exploration. If ρ highly concentrates on a subset of
+S, then the agent may not be able to explore all the states
+and may end up with a sub-optimal solution. To solve this
+issue, we introduce an optimization measure µ satisfying
+µmin , mins µ(s) > 0 (Agarwal et al., 2021). The initial
+state distribution ρ is called the performance measure. As
+we will show in the next section, although we want to minimize Eρ[V
+π
+], we can perform sub-gradient descent with
+respect to Jµ , Eµ[V
+π
+] and the algorithm can still find an
+optimum of Eρ[V
+π
+].
+Given the robust policy gradient in Theorem 3.3, we design our robust policy gradient algorithm in Algorithm 1.
+We note that our Algorithm 1 can be applied to any arbitrarily parameterized policy class that is differentiable and
+Lipschitz. Here Q
+Θ denotes the projection onto Θ.
+Algorithm 1 Robust Policy Gradient
+Input: T, αt
+Initialization: θ0
+for t = 0, 1, ..., T − 1 do
+θt+1 ←
+Q
+Θ(θt − αtψµ(θt))
+end for
+Output: θT
+4. Global Optimality: Direct
+Parameterization
+In this section, we show that the robust objective function Jρ(θ) satisfies the Polyak-Łojasiewicz (PL) condition when the direct parametric policy class is used, i.e.,
+Θ = (∆(A))|S|
+and πθ(a|s) = θs,a, and we further show
+the global optimality of Algorithm 1.
+Algorithm 1 is in fact a sub-gradient descent algorithm for
+a non-convex function Jµ. Following classic results from
+stochastic approximation and optimization (Beck, 2017;
+Borkar, 2009; Borkar & Meyn, 2000), Algorithm 1 is expected to converge to stationary points only. Showing the
+global optimality requires further characterization of Jµ,
+which involves the “max” over κ, and is thus more challenging than the vanilla non-robust case.
+We first show that the robust objective function Jρ satisfies
+the PL-condition under the direct parameterization. Informally, a function f(θ) is said to satisfy the PL condition
+if f(θ) − f(θ
+∗
+) ≤ O(F(∇f(θ))), for some suitable scalar
+notion of first-order stationarity F, which measures how
+large the gradient is (Karimi et al., 2016; Bolte et al., 2007a).
+This condition implies that if a solution is close to some
+first-order stationary point, the function value is then close
+to the global optimum.
+Theorem 4.1 (PL-Condition). Under direct policy parame-
+Policy Gradient Method For Robust Reinforcement Learning
+terization and for any optimization measure µ ∈ ∆(S) and
+performance measure ρ ∈ ∆(S),
+Jρ(θ) − J
+∗
+ρ ≤ CP L max
+πˆ∈(∆(A))|S|
+hπθ − π, ψ ˆ µ(θ)i, (8)
+where CP L =
+1
+(1−γ)µmin
+.
+Note that ψµ(θ) on the right hand side of (8) is a subgradient of Jµ, and Jρ(θ) on the left hand side of (8) is
+the objective function with respect to ρ. Therefore, for any
+optimization measure µ, a stationary point of Jµ is a global
+optimum of Jρ. Thus the PL-condition in Theorem 4.1 with
+results from stochastic approximation will lead to the global
+optimality of Algorithm 1 in the following theorem.
+Theorem 4.2. If αt > 0,
+P∞
+t=0 αt = ∞ and P∞
+t=0 α
+2
+t <
+∞, then Algorithm 1 converges to a global optimum of Jρ(θ)
+almost surely.
+Theorem 4.2 suggests that our robust policy gradient algorithm converges to a global optimum, which matches
+the global optimality results for vanilla policy gradients
+in e.g., (Agarwal et al., 2021; Mei et al., 2020). However, the analysis here is much more challenging due to
+the non-differentiable objective function and min-max problem structure.
+5. Smoothed Robust Policy Gradient
+It is in general challenging to analyze the convergence rate
+of Algorithm 1, which is a projected sub-gradient descent
+algorithm for non-differentiable non-convex function. In
+this section, we construct a smoothed approximation Jσ,ρ,
+which converges to Jρ as σ → ∞. We develop a smoothed
+robust policy gradient, and show that the smoothed Jσ,ρ
+satisfies the PL-condition. We characterize its global optimality and show that to achieve an -global optimal, the
+complexity is O(
+−3
+).
+For convenience, in the remaining of this paper we assume
+that ρ = µ and ρmin > 0, and we omit the subscript ρ in Jρ
+and Jσ,ρ. The algorithm design and theoretical results can
+be similarly extended to the general setting with ρ 6= µ as
+in Section 3 and Section 4.
+We use the LogSumExp (LSE) operator to approximate the
+max operator, where
+LSE(σ, V ) = log(Pd
+i=1 e
+σV (i)
+)
+σ
+for V ∈ R
+d
+and some σ > 0. The approximation error
+|LSE(σ, V ) − max V | → 0 as σ → ∞. By replacing max
+in (2) using LSE, the smoothed Bellman operator is
+T
+π
+σV (s) = EA∼π(·|s)
+
+c(s, A) + γ(1 − R)
+X
+s
+0∈S
+p
+A
+s,s0V (s
+0
+)
++ γR · LSE(σ, V )
+
+. (9)
+The reason why we do not use soft-max is because with
+soft-max, the induced Bellman operator is not a contraction
+anymore (Asadi & Littman, 2017; Wang & Zou, 2021).
+With LSE, Tπ
+σ
+is a contraction and has a unique fixed point
+(Wang & Zou, 2021), which we denote by V
+π
+σ
+and name as
+the smoothed robust value function. We can also define the
+smoothed robust action-value function Qπ
+σ
+(s, a) , c(s, a) +
+γ(1 − R)
+P
+s
+0∈S
+p
+a
+s,s0V
+π
+σ
+(s
+0
+) + γR · LSE(σ, V π
+σ
+).
+Clearly, V
+π
+σ
+is differentiable in θ and it converges to V
+π
+as
+σ → ∞. We then define the smoothed objective function as
+Jσ(θ) = X
+s∈S
+ρ(s)V
+πθ
+σ
+(s), (10)
+and let J
+∗
+σ = minθ Jσ(θ). Note Jσ(θ) is an approximation
+of J(θ), and J
+∗
+σ
+also converges to J
+∗
+as σ → ∞. In the
+following theorem, we derive the gradient of Jσ, which
+holds for any differentiable policy class.
+Theorem 5.1. Consider a policy class ΠΘ that is differentiable. The gradient of Jσ(θ) is
+∇Jσ(θ) = B(ρ, θ) + γRP
+s∈S
+e
+σV πθ
+σ (s)B(s, θ)
+(1 − γ)
+P
+s∈S
+e
+σV πθ
+σ (s)
+, (11)
+where B(s, θ) ,
+1
+1−γ+γR
+P
+s
+0∈S
+d
+π
+s
+(s
+0
+)
+P
+a∈A ∇πθ(a|s
+0
+)
+· Qπθ
+σ
+(s
+0
+, a), and B(ρ, θ) , ES∼ρ[B(S, θ)].
+We then design the smoothed robust policy gradient algorithm in Algorithm 2.
+Algorithm 2 Smoothed Robust Policy Gradient
+Input: T, σ, αt
+Initialization: θ0
+for t = 0, 1, ..., T − 1 do
+θt+1 ←
+Q
+Θ (θt − αt∇Jσ(θt))
+end for
+Output: θT
+5.1. Global Optimality Under Direct Parameterization
+We focus on direct policy parameterization. We show
+that the smoothed objective function Jσ satisfies the PLcondition and develop the global optimality of Algorithm 2.
+Theorem 5.2. (PL-Condition) Consider direct policy parameterization. Then
+Jσ (θ) − J
+∗
+σ ≤ CP L max
+πˆ∈(∆(|A|))|S|
+hπθ − π, ˆ ∇Jσ (θ)i
++
+
+γR
+1 − γ
+
+2 log |S|
+σ
+. (12)
+Policy Gradient Method For Robust Reinforcement Learning
+This theorem implies that if the gradient ∇Jσ(θ) is small,
+then θ falls into a small neighbour (radius of O(σ
+−1
+)) of the
+global optimum J
+∗
+σ
+. By choosing a large σ, the difference
+between Jσ (θ)−J
+∗
+ρ
+can be made arbitrarily small, and thus
+the global optimality with respect to J
+∗
+ρ
+can be established.
+5.2. Convergence Rate
+We then study the convergence rate of Algorithm 2 under
+direct policy parameterization. We first make an additional
+smoothness assumption on ΠΘ.
+Assumption 5.3. ΠΘ is lπ-smooth, i.e., for any s ∈ S and
+a ∈ A and for any θ1, θ2 ∈ Θ,
+k∇πθ1
+(a|s) − ∇πθ2
+(a|s)k ≤ lπkθ1 − θ2k. (13)
+Then under Assumption 5.3, we show that Jσ is Lσ-smooth.
+Lemma 5.4. Under Assumptions 3.2 and 5.3, for any θ1, θ2,
+k∇Jσ(θ1) − ∇Jσ(θ2)k ≤ Lσkθ1 − θ2k, (14)
+where Lσ = O(σ) and its exact definition is in (89).
+The value of σ controls the tradeoff between the smoothness
+of Jσ and the approximation error between Jσ and J.
+Theorem 5.5. For any  > 0, set σ =
+2γR log |S|
+(1−γ) = O(
+−1
+)
+and T =
+64|S|C
+2
+P LLσCσ
+
+2 = O(
+−3
+) in Algorithm 2
+2
+, then
+min
+t≤T −1
+J(θt) − J
+∗ ≤ 3. (15)
+Theorem 5.5 shows that Algorithm 2 converges to an -
+global optimum within O(
+−3
+) steps. This rate is slower
+than the one of non-robust policy gradient in (Agarwal et al.,
+2021) by a factor of O(
+−1
+), which is due to the additional
+robustness requirement and the smoothing technique using
+σ. If we set R = 0, i.e., no robustness, the value of σ will
+then be irrelevant, and our algorithm reduces to non-robust
+policy gradient algorithm. With R = 0, Lσ = O(1) and
+Cσ = O(1), then our complexity also reduces to O(
+−2
+),
+which is the same as the one in (Agarwal et al., 2021).
+6. Robust Actor-Critic
+The results discussed so far assume full knowledge of robust value functions and visitation distributions, and thus
+the (smoothed) robust policy gradient is exactly known.
+Although this is a commonly used setting for theoretical
+analysis e.g., in (Agarwal et al., 2021; Mei et al., 2020;
+Bhandari & Russo, 2019; Cen et al., 2021), such knowledge
+is usually unknown in practice. In this section, we focus on
+the practical model-free setting where only training samples
+from the centroid transition kernel P can be obtained.
+2Cσ =
+1
+1−γ
+(1 + 2γRlog |S|
+σ
+) denotes the upper bound of Q
+π
+σ.
+As can be seen from (7) and (11), to obtain the (smoothed)
+robust policy (sub)-gradient, we first need to estimate the
+robust value function. Robust value function measures the
+performance on the worst-case transition kernel which is typically different from the one that generates samples. However, Monte Carlo (MC) method can only be used to estimate
+the value function on the kernel that generates the samples.
+To solve this issue, we design a robust TD algorithm, and
+combine it with our robust policy gradient descent to design the robust actor-critic algorithm. Consider a parametric
+robust action value function Qζ , e.g., linear function approximation, neural network. The robust TD algorithm is given
+in Algorithm 3. Note that by replacing max in the algorithm
+by LSE we can also get the smoothed robust TD algorithm
+to estimate V
+π
+σ
+.
+Algorithm 3 Robust TD
+Input: Tc, π, βt
+Initialization: ζ, s0
+Choose a0 ∼ π(·|s0)
+for t = 0, 1, ..., Tc − 1 do
+Observe ct, st+1
+Choose at+1 ∼ π(·|st+1)
+V
+∗
+t ← maxs
+P
+a∈A π(a|s)Qζ (s, a)
+	
+δt ← Qζ (st, at) − ct − γ(1 − R)Qζ (st+1, at+1) −
+γRV ∗
+t
+ζ ← ζ − βtδt∇ζQζ (st, at)
+end for
+Output: ζ
+We provide the convergence proof of robust TD under the
+tabular setting in Appendix C.1. For convergence under
+general function approximation, additional regularity conditions might be needed (Korda & La, 2015; Dalal et al., 2018;
+Bhandari et al., 2018; Cai et al., 2019; Roy et al., 2017).
+With the robust TD algorithm, we then develop our robust
+actor-critic algorithm in Algorithm 4. The algorithm can be
+applied with any differentiable value function approximation and parametric policy class.
+We then smooth and specialize Algorithm 4 to the tabular
+setting with direct policy parameterization (see Algorithm 6
+in Appendix C.2 for the details). We derive the global
+optimality and convergence rate for smoothed robust actorcritic in the following theorem. In the algorithm, we set
+Tc large enough so that kQTc − Qπ
+σk∞ ≤ est, where for
+est denotes the estimate error of robust value function. We
+note that the smoothed robust TD algorithm in Algorithm 5
+can be shown to converges to an est-global optimum with
+O(
+−2
+est ) samples following similar methods as in (Wang &
+Zou, 2021).
+Theorem 6.1. For the smoothed robust actor-critic algo-
+Policy Gradient Method For Robust Reinforcement Learning
+Algorithm 4 Robust Actor-Critic
+Input: T, Tc, σ, αt, M
+Initialization: θ0
+for t = 0, 1, ..., T − 1 do
+Run Algorithm 3 for Tc times
+Qt ← QζTc
+Vt(s) ←
+P
+a∈A πθ(a|s)Qt(s, a) for all s ∈ S
+for j = 1, ..., M do
+Sample T
+j ∼ Geom(1 − γ + γR)
+Sample s
+j
+0 ∼ ρ
+Sample trajectory from s
+j
+0
+: (s
+j
+0
+, a
+j
+0
+, ..., s
+j
+Tj ) following πθt
+B
+j
+t ← 1
+1−γ+γR
+P
+a∈A ∇πθ(a|s
+j
+Tj )Qt(s
+j
+Tj
+, a)
+x
+j
+0 ← arg maxs Vt(s)
+Sample trajectory from x
+j
+0
+: (x
+j
+0
+, bj
+0
+, ..., x
+j
+Tj ) following πθt
+D
+j
+t ← 1
+1−γ+γR
+P
+a∈A ∇πθ(a|x
+j
+Tj )Qt(x
+j
+Tj
+, a)
+g
+j
+t ← B
+j
+t +
+γR
+1−γ
+D
+j
+t
+end for
+gt ←
+PM
+j=1 g
+j
+t
+M
+θt+1 ←
+Q
+Θ(θt − αtgt)
+end for
+Output: θT
+rithm under the tabular setting with direct policy parameterization, if we set est = O(
+2
+), M = O(
+−2
+) and
+T = O(
+−3
+), then,
+min
+t≤T
+E[J(θt) − J
+∗
+] ≤ 7. (16)
+An explicit bound can be found in (161) in the Appendix.
+The sample complexity of Robust TD (Algorithm 5) is
+O(
+−2
+est ), then the robust TD requires Tc = O(
+−4
+) samples. Hence the overall sample complexity of Algorithm 6
+is O(T(M + Tc)) = O(
+−7
+) to find an -global optimum.
+7. Numerical Results
+In this section, we demonstrate the convergence and robustness of our algorithms using numerical experiments.
+We test our algorithms on the Garnet problem (Archibald
+et al., 1995) and the Taxi environment from OpenAI (Brockman et al., 2016). The Garnet problem can be specified by G(Sn, An), where the state space S has Sn states
+(s1, ..., sSn
+) and action space has An actions (a1, ..., aAn
+).
+The agent can take any actions in any state, but only gets
+reward r = 1 if it takes a1 in s1 or takes a2 in other states (it
+will receive 0 reward in other cases). The transition kernels
+are randomly generated.
+7.1. Robust v.s. Non-robust Policy Gradient
+We first compare our robust policy gradient method with
+vanilla policy gradient. To show the robustness of our algorithm over the vanilla policy gradient method, we compare
+their robust value functions, i.e., worst-case performance,
+for different values of R. We first train the robust policy gradient algorithm and store the obtained policy θt at each time
+step. At each time step, we run robust TD in Algorithm 5
+with a sample size 200 for 30 times to estimate the average
+objective function value J(θt). We then plot J(θt) v.s. the
+number of iterations t on the Garnet problems G(12, 6) and
+G(20, 10) in Figure 1 and Figure 2, respectively, and plot
+results on the Taxi environment from OpenAI in Figure 3.
+We do the same for the vanilla policy gradient method. The
+upper and lower envelopes of the curves correspond to the
+95 and 5 percentiles of the 30 curves, respectively.
+As can be seen from Figure 1, when R = 0, the robust
+policy gradient method reduces to the non-robust vanilla
+policy gradient, and our results show both algorithms have
+the same performance. When R > 0, the robust policy
+gradient obtains a policy that performs much better than the
+non-robust vanilla policy gradient, which demonstrates the
+robustness of our method.
+(a) R = 0. (b) R = 0.1.
+(c) R = 0.15. (d) R = 0.25.
+Figure 1. Robust Policy Gradient v.s. Non-robust Policy Gradient
+on Garnet Problem G(12, 6).
+7.2. Smoothed Robust Policy Gradient
+In this section, we demonstrate the performance of our
+smoothed robust policy gradient method on the Garnet problem G(12, 6). As we showed in Section 5, the smoothed
+algorithm approximate the robust policy gradient algorithm
+as σ → ∞. Here, we set different values of σ in Algorithm
+2 and plot their objective functions v.s. number of iterations
+Policy Gradient Method For Robust Reinforcement Learning
+(a) R = 0.2. (b) R = 0.25.
+Figure 2. Robust Policy Gradient v.s. Non-robust Policy Gradient
+on Garnet Problem G(20, 10).
+(a) R = 0.1. (b) R = 0.15.
+Figure 3. Robust Policy Gradient v.s. Non-robust Policy Gradient
+on Taxi Problem.
+to demonstrate such an approximation.
+As shown in Figure 4, when σ is small (e.g., σ = 1), the
+performance of smoothed robust policy gradient is poor.
+As σ increases, smoothed robust policy gradient behaves
+similarly to the robust policy gradient, which corresponds
+to the curve with σ = ∞. This experiment hence verifies
+our theoretical results that we can approximate the robust
+policy gradient by choosing a suitably large σ.
+(a) R = 0.1. (b) R = 0.15.
+Figure 4. Smoothed Robust Policy Gradient.
+7.3. Robust Actor-Critic
+In Figure 5, we consider Garnet problem G(30, 20) using
+neural network parameterized policy, where we use a twolayer neural network with 15 neurons in the hidden layer
+to parameterize the policy πθ. We then use a two-layer
+neural network (with 20 neurons in the hidden layer) in the
+critic. At each time step, we run Algorithm 3 for 30 times to
+estimate the robust value function. We then use the estimate
+to simulate Algorithm 4. We plot J(θt) v.s. the number of
+iterations in Figure 5, and the upper and lower envelopes
+of the curves correspond to the 95 and 5 percentiles of the
+30 trajectories. As the results show, our robust actor-critic
+algorithm finds a policy that achieves a higher accumulated
+discounted reward on the worst-case transition kernel than
+the vanilla actor-critic algorithm (Sutton & Barto, 2018).
+(a) R = 0.15. (b) R = 0.2.
+Figure 5. Robust Actor-Critic (AC) v.s. Non-robust Actor-Critic
+on Garnet Problem G(30, 20).
+7.4. Comparison with RARL
+We compare our robust algorithms with the robust adversarial reinforcement learning (RARL) approach in (Pinto et al.,
+2017). The basic idea of the RARL approach is to introduce
+an adversary that perturbs the state transition to minimize
+the accumulated discounted reward. Then the agent and the
+adversary are trained alternatively using adversarial training.
+To apply their algorithm to our problem setting, we set an adversarial player, whose goal is to minimize the accumulated
+discounted reward that the agent receives. The action space
+Aad of the adversary is the state space Aad , S. The agent
+and the adversary take actions aa, aad, then the environment
+will transit to state aad with probability R or transit following the unperturbed MDP p
+aa
+s with probability 1 − R. We
+compare our robust actor-critic algorithm with the RARL
+algorithm on the Taxi environment. Similarly, at each time
+step, we run Algorithm 3 with neural function approximation for 30 times to estimate the robust value function. We
+then use the results to simulate Algorithm 4 and RARL. We
+plot the robust value function J(θt) v.s. the number of iterations in Figure 6. The upper and lower envelops correspond
+the 95 and 5 percentiles of the 30 trajectories. As Figure 6
+shows, our robust actor-critic algorithm achieves a much
+higher accumulative discounted reward than the RARL approach under the worst-case transition kernel, and thus is
+more robust to model mismatch.
+8. Discussions
+In this paper, we develop direct policy search method for robust RL. Our robust algorithms can be applied with arbitrary
+differentiable value function approximation and policy parameterization, and thus is scalable to problems with large
+Policy Gradient Method For Robust Reinforcement Learning
+(a) R = 0.1. (b) R = 0.15.
+Figure 6. Robust Actor-Critic v.s. RARL on Taxi Environment.
+state and action spaces. In this paper, the analysis is for
+the direct policy parameterization. Our approach can also
+be extended to establish the global optimality under other
+policy parameterizations, e.g., softmax. It is also of future
+interest to develop robust natural policy gradient approaches
+for robust RL. We focus on the R-contamination model
+for the uncertainty set, which can be closely related to sets
+defined by total variation and Kullback-Leibler divergence
+using Pinsker’s inequality. It is also of future interest to
+investigate model-free approaches for other uncertainty sets
+defined via e.g., total variation, Kullback-Leibler divergence,
+Wasserstain distance.

@@ -1,0 +1,894 @@
+ML-BENCH: LARGE LANGUAGE MODELS LEVERAGE
+OPEN-SOURCE LIBRARIES FOR MACHINE LEARNING
+TASKS
+Yuliang Liu∗♣ Xiangru Tang∗♠ Zefan Cai∗♡ Junjie Lu Yichi Zhang Yanjun Shao
+Zexuan Deng Helan Hu Zengxian Yang Kaikai An Ruijun Huang Shuzheng Si
+Sheng Chen Haozhe Zhao Zhengliang Li Liang Chen Yiming Zong Yan Wang
+Tianyu Liu Zhiwei Jiang Baobao Chang Yujia Qin Wangchunshu Zhou Yilun Zhao♠
+Arman Cohan♠ Mark Gerstein♠
+♠ Yale University ♣ Nanjing University ♡ Peking University
+xiangru.tang@yale.edu
+ABSTRACT
+Large language models have shown promising performance in code generation
+benchmarks. However, a considerable divide exists between these benchmark
+achievements and their practical applicability, primarily attributed to real-world
+programming’s reliance on pre-existing libraries. Instead of evaluating LLMs to
+code from scratch, this work aims to propose a new evaluation setup where LLMs
+use open-source libraries to finish machine learning tasks. Therefore, we propose
+ML-BENCH, an expansive benchmark developed to assess the effectiveness of
+LLMs in leveraging existing functions in open-source libraries. Consisting of
+10,040 samples spanning 130 tasks over 14 notable machine learning GitHub
+repositories. In this setting, given a specific machine learning task instruction and
+the accompanying README in a codebase, an LLM is tasked to generate code to
+accomplish the task. This necessitates the comprehension of long and languagecode interleaved documents, as well as the understanding of complex cross-file code
+structures, introducing new challenges. Notably, while GPT-4 exhibits remarkable
+improvement over other LLMs, it manages to accomplish only 39.73% of the tasks,
+leaving a huge space for improvement. We address these challenges by proposing
+ML-AGENT, designed to effectively navigate the codebase, locate documentation,
+retrieve code, and generate executable code. Empirical results demonstrate that
+ML-AGENT, built upon GPT-4, results in further improvements. Code, data, and
+models are available at https://ml-bench.github.io/.
+1 INTRODUCTION
+Large Language Models (LLMs) have demonstrated remarkable capabilities in function-level code
+generation, producing sophisticated code snippets with remarkable performance (Li et al., 2022;
+Austin et al., 2021; Hendrycks et al., 2021; Chen et al., 2021; Bui et al., 2023; Tang et al., 2023a;
+Fried et al., 2022; Chen et al., 2023c) in existing code generation benchmarks These models have
+been progressively used as powerful language agents, equipped to undertake various programmingrelated tasks (Liu et al., 2023b; Zhou et al., 2023; Shinn et al., 2023; Xie et al., 2023). Despite
+these significant strides, a notable gap remains between the competencies exhibited by these models
+under controlled experimental conditions and the dynamic requirements of real-world programming
+scenarios (Jimenez et al., 2023).
+Existing code generation benchmarks often evaluate LLM’s ability to write code from scratch.
+However, practices in programming seldom demand the creation of all code elements from scratch.
+∗YL, XT, and ZC contribute equally, while XT leads this project. The remaining contribute to data annotation.
+arXiv:2311.09835v1 [cs.CL] 16 Nov 2023
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Figure 1: ML-BENCH collects data from 14 machine learning GitHub repositories through a threestep pipeline: Extracting readme information, automatically generates instructions, and forms standardized outputs. Furthermore, we introduce the ML-AGENT to accomplish proposed task, and then
+evaluated it on ML-BENCH against the currently highly robust language model.
+Real-world programming often involves employing pre-existing and open-source libraries to accomplish tasks effectively and efficiently (Zan et al., 2023). These evolved libraries offer robust,
+battle-tested solutions to a broad range of problems. Therefore, measuring the efficacy of code LLMs
+should not merely be restricted to function generation (Shrivastava et al., 2023; Liu et al., 2023a;
+Zhang et al., 2023). It should also encompass their proficiency in executing programming files from
+open-source libraries with precise parameter use.
+This brings to light a more challenging, but more practical target for code LLMs - generating code
+that can successfully execute programming files and utilize resources with parameters accurately from
+open-source libraries. This target often demands not just code generation, but also comprehension
+of natural language documentation appended to the code, such as README files. README files
+typically provide a walkthrough of the open-source library, offering detailed narratives on different
+task examples that the library can handle, including guidance on parameter selection. In reality, the
+parameters stipulated by the user may not always align with those enumerated in the README
+examples, mandating the LLM to accurately adapt the parameter values based on the user’s specific
+requirements. Hence, an LLM with the ability to effectively interpret, leverage the information within
+README files, and precisely customize parameters in code based on README examples, would
+significantly advance machine learning automation.
+We introduce ML-BENCH, a comprehensive and realistic benchmark dataset designed to evaluate
+LLMs and their capabilities in understanding user instructions, navigating GitHub repositories, and
+writing executable code. ML-BENCH provides high-quality instructions along with corresponding
+executable ground truth code that meets the requirements specified in the instructions. ML-BENCH
+consists of 9444 samples spanning 130 tasks over 14 notable machine learning GitHub repositories.
+In the experiments, we adopt metrics such as Pass@k and Parameter Hit Precision and delve deeper
+into the capabilities of GPT-3.5-16k, GPT-4-32k, Claude 2, and CodeLlama in ML-BENCH setups.
+ML-BENCH proposes new challenges to LLMs. Empirically, we find that GPT models and Claude 2
+performed significantly better than CodeLlama. A key insight from our study is the crucial need for
+LLMs to comprehend long-text documentation, not just generate code. Based on our error analysis,
+our primary technical endeavor in this work is the proposition of the ML-AGENT, an autonomous
+language agent developed to fill the gaps highlighted earlier. These agents are empowered to
+understand natural language and instructions, to produce requisite code effectively, and to solve
+complex tasks.
+2
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Our findings and contributions can be summarized as:
+• We propose a novel task that requires LLMs to comprehend long-context documents, navigate codebases, understand instructions, and generate executable code. We propose MLBENCH, a benchmark to evaluate the effectiveness of LLMs in utilizing existing libraries
+and performing machine learning tasks.
+• We carefully provide various settings to accommodate different LLMs (i.e., closed-source
+LLMs, open-source LLMs, and agents) Additionally, we carefully design comprehensive
+and fair evaluation metrics to quantify the performance of LLMs.
+• We conduct comprehensive evaluations across settings and popular LLMs. Experiments
+show that GPT-4 performs remarkable improvement over other LLMs, but still only manages
+to accomplish 39.73% of the tasks. Other popular LLms suffer from hallucinations and
+perform poorly. Based on error analysis, we further propose ML-AGENT to address the
+challenging tasks.
+2 DATASET AND BENCHMARK
+In this section, we provide detailed information about the task formulation, selected repositories and
+data annotation pipeline of the benchmark. In Section 2.1, we provide a clear definition of the task.
+In Section 2.2, we explain how we choose the selected 14 GitHub repositories. In Section 2.3, we
+describe the annotation pipeline of dataset construction. Finally, in Section 2.4, we present some
+statistics regarding the dataset.
+2.1 TASK FORMULATION
+In our benchmark, we focus on a scenario where, given a GitHub repository F, the language model
+has access to all files f ∈ F within the repository. Upon receiving a user instruction i with a set
+of specific parameters argi ∈ A, the ML-AGENT is required to write code c that invokes models
+or functions from the GitHub repository. We emphasize that the generated code c must align with
+the user’s instruction i, particularly in terms of all specified parameters argi ∈ A, and must be
+executable. This approach ensures that the model’s output meets the user’s needs and adheres to
+practical application standards.
+2.2 REPOSITRIES SELECTION
+We collected all papers and their corresponding GitHub links from the PapersWithCode website 1
+.
+Subsequently, we organized these papers based on their categorical information (i.e., tasks, models,
+datasets, modalities) From each category, we selected the top repositories based on the ranking
+of stars. Further, through manual filtering, we identified the most representative and feature-rich
+repositories from this subset, finally making our large group of 14 repositories. More details about
+the selected repositories can be found in Sec. 2.4 and Appendix A.
+2.3 ANNOTATION PIPELINE
+About data annotation, relying solely on human efforts can be a time-intensive and labour-intensive
+process. To address this challenge, we have developed a comprehensive workflow with the help
+of LLMs to facilitate the dataset annotation process. Our annotators consist of undergraduates and
+graduate students with proficient programming skills. Each GitHub repository is assigned to a
+designated annotator. 2
+1https://paperswithcode.com/
+2The minimum hourly wage in the United States is near $7.5, which can be found at https://www.wo
+rker.gov/. On average, annotating an example takes 5 hours. Consequently, the cost per annotator amounts
+to $37.5.
+3
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Figure 2: The data construction of ML-BENCH, encompassing 14 prominent GitHub repositories
+and aggregating a total of 10,040 samples
+.
+README Page Selection When users utilize a GitHub repository to accomplish tasks, the
+README file is often the most valuable resource. The README effectively demonstrates the
+usage of various codes, functions and classes contained within the repository. Therefore, we instruct
+these annotators to carefully review the contents of the repository first. Their primary task includes
+identifying all README files within the repository. This encompasses not only the main README
+but also those located in various sub-directories, which describe the contents of their respective
+folders. Although more than half of GitHub repositories contain only a single README file, there
+are instances where a repository may include numerous README files. Each of these files typically
+documents only a fraction of the repository’s functionality. In average, each GitHub covers 15
+README pages, while GNN covers 154 README pages. 3
+Task Mining After identifying all the README files contained within a GitHub repository,
+our annotators are tasked with pinpointing each task covered by every README, along with the
+code scripts capable of accomplishing these tasks. The anotators are instructed to select the most
+representative and practical tasks inside each GitHub. In average, each GitHub repository covers 9
+tasks.
+Parameter Extraction In addition to specifying the task, users may also need to define important parameters, as the setting of these parameters is crucial to the effectiveness of finishing the
+task. Therefore, upon identifying the tasks and corresponding code within the README files, the
+annotators are further tasked with locating key parameters in the code (such as batch size, epochs,
+model architecture, and dataset). Annotators all have experience in machine learning or deep learning
+development, they are guided to select the most important parameters and corresponding candidate
+values that they will search in machine learning development. We aim for these parameters to be
+sufficiently representative, encapsulating essential parameters that engineers are likely to search and
+test during practical experiments.
+Multi-Parameter Combination Once the code and its pertinent parameters for each task were
+identified, we instructed the annotators to iteratively and systematically combine candidate values for
+3https://github.com/pyg-team/pytorch_geometric
+4
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Argument combination 1
+wiki_cs, 128, , 5e-3
+……
+Argument combination N
+amazon_photos, 256, 5e-1
+This DGL example implements the GNN experiment proposed in the
+paper Large-Scale Representation Learning on Graphs via Bootstrapping. For the
+original implementation, see here(URL).
+Requirements
+The codebase is implemented in Python 3.8. For version requirement of
+packages, see below.
+• dgl 0.8.3
+• numpy 1.21.2 …
+Dataset
+Dataset summary:
+Step1: ReadMe Page Selection Step3: Argument Extraction
+Dataset: wiki_cs, amazon_photos, amazon_computers, coauthor_cs ...
+Graph Encoder Layer: 64, 128, 256, 512, 1024 …
+Learning Rate: 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1 …
+Step4: Multi-Argument Combination
+Step5: Diverse Instruction Construction
+Step6: Ground Truth Code Construction
+In Selected Argument:
+Human Instruction: I have a dataset entitled wiki_cs that I'm eager to
+utilize for training purposes. Specifically, I'm aiming to employ this
+dataset to train a cutting-edge BGRL Model. To achieve optimal
+performance, I intend to utilize graph encoder layer 128, alongside a
+learning rate (lr) of 0.005. Could you kindly assist me in crafting the
+necessary code to accomplish this task?”
+python main.py \
+--dataset wiki_cs \
+--graph_encoder_layer 128 \
+--drop_edge_p 0.3 \
+--feat_mask_p 0.25 \
+--lr 5e-3
+Dataset Task Nodes Edges Features
+WikiCS Transductive 11,701 216,123 300
+Amazon Computers Transductive 13,752 245,861 767
+Amazon Photos Transductive 7,650 119,081 745
+Coauthor CS Transductive 18,333 81,894 6,805
+Step2: Task Mining
+Selected Argument :
+wiki_cs,
+128
+5e-3
+README path: dgl/examples/pytorch/bgrl/README.md
+Inductive Task
+python main.py \
+--dataset coauthor_cs \
+--graph_encoder_layer 1024 \
+--drop_edge_p 0.3 \
+--feat_mask_p 0.25 \
+--lr 5e-2
+Figure 3: The construction pipeline of the ML-BENCH. Step1: Find the readme file in the repository
+that implements a specific task. Step2: Essential task-related information is discerned. Step3: Extract
+parameters from task mining. Step4: Leveraging the details extracted from the readme file, multiple
+combinations of parameters are formulated. Step5: Creating the instructions for each parameter
+combinations. Step6: Substitutes the code or script within the readme, serving as the ground truth
+code for ML-BENCH.
+selected parameters. This combinatorial approach resulted in numerous combinations of parameters
+that are relevant to each task. For every unique combination of parameters, we employed templates to
+construct code scripts and instructions that satisfy the requirements of these parameter combinations.
+Diverse Instruction Construction For each set of parameters obtained during the Multi-Parameter
+Combination process, we utilized ChatGPT to generate instructions specifically tailored to the task
+and these parameters. We meticulously design templates to ensure that output instructions contain
+the given parameter requirements and exhibit a strong diversity by providing specific parameter
+indications and various diverse examples.
+Ground Truth Code Construction Based on the parameter combinations obtained during the
+Multi-Parameter Combination process, we further produce a code template based on the code for
+target task. Then we use the code template to construct ground truth code.
+Quality Test We have conducted rigorous quality checks on the dataset. Specifically, for the ground
+truth output, we perform strict checks for executability and meeting parameter requirements. Any
+data that did not meet the requirements were discarded. Regarding the instructions, we conducted
+checks to ensure that all parameters were explicitly specified within the instruction. Any instructions
+that did not meet the requirements were manually corrected.
+2.4 OVERALL STATISTICS
+Referring to the ML-BENCH data construction process detailed in Section 2.3, we carefully curated
+a GitHub repository tailored to prominent Machine Learning domains, serving as the cornerstone
+of our ML-BENCH dataset. This extensive dataset is partitioned into separate training and testing
+subsets, designed for distinct purposes in training and evaluation. Table 1 delineates the specific data
+statistics for each subset. Further elaboration on the detailed data metrics for each repository utilized
+can be found in Appendix 10.
+5
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Raw README Oracle Segment BM25
+Train
+Average token length 8009.42 151.32 492.90
+Max token length 20701 851 5540
+OOD Train
+Average token length 4118.90 186.04 585.80
+Max token length 8363 367 1339
+Test
+Average token length 8331.47 1275.22 1102.49
+Max token length 20655 5420 3192
+Table 1: The average token length and maximum token length of README files across three settings:
+Train, Out-of-Distribution (OOD) Train, and Test settings within the ML-BENCH.
+The comprehensive statistics of ML-BENCH are itemized in Table 2, which culled from our selected
+GitHub repositories, offering statistical insights into the diverse range of instructions we meticulously
+developed.
+3 EXPERIMENTS
+In this section, we predent details about the experiment. In Sec. 3.1, we describe the experimental
+setup of ML-BENCH, along with the associated evaluation metrics. In Sec. 3.2, we introduce the
+model used in the experiments. In Sec. 3.3, we present how we formulate the dataset into input for
+LLms. In Sec. 3.4, we present the details of evaluation setting and metrics. In Sec. 3.6 , we present
+results of popular models in ML-BENCH.
+3.1 EXPERIMENTAL SETUP
+Our input includes both human instructions for the task and README files. We have three experimental setups, each differing in terms of how the content of README files are presented. The
+purpose of controlling the input content’s form is to replicate real-world situations. With manual
+annotation, we identify the relevant segments including code and texts inside the README files
+that should be utilized to finish the task, which we term as "Oracle Segments". This segment should
+provide all supporting evidence required to produce the ground truth code. In addition, we offer two
+simulated scenarios: one provides the complete README file, while the other uses a BM25 retriever
+to extract task-related segments from the README file.
+Here are the detailed descriptions of the three settings:
+Task Number
+- GNN 608
+- Text 1475
+- Molecular 649
+- Image-GAN 1189
+- Text and image 3646
+- Video 75
+- Time-series 1478
+- Attention Usage 127
+- Medical 805
+Average token length per instruction 70.4
+Max token length in instruction 216
+Instruction edit distance among the same task 238.4
+Instruction edit distance across tasks 300.1
+Table 2: The statistics of ML-BENCH.
+6
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Oracle Segment: Our annotators keep a record of the corresponding segments for the task in the
+README file when writing the ground-truth code. Typically, this process involves initially locating
+an example code for a task within the README file and subsequently altering its parameters to yield
+a new task and its respective ground-truth code. An Oracle Segment usually consists of a task-related
+code example coupled with its natural language explanation in the README file.
+Raw README: In this setting, we present the entirety of the README content to the model without
+any modifications. If the length of the README exceeds the model’s maximum context limit, the
+part of the text that falls outside this window at the end will be truncated.
+BM25 Retrieval: We employ a BM25 retriever to assist the model in locating relevant information
+within the README. The BM25 retriever deploys the NLTK sentence tokenizer 4
+, and we have set a
+uniform retrieval span of 10 sentences. The average length of an Oracle Segment is 9.5 sentences,
+suggesting that the majority of relevant information can be found within this range. Also, README
+files have an average sentence length of 106, so limiting the retrieval window to 10 sentences helps
+manage the overall data volume by focusing on the most important sections.
+3.2 MODEL
+The maximum length of the README files is 14.9k tokens (based on the gpt-3.5-turbo token
+generator) based on tiktoken tool5
+. To ensure that we did not exceed this limit, we utilized GPT-3.5-
+16k, GPT-4-32k, and Claude 2 models.
+To examine the performance of open-source models, we chose CodeLlama6
+(CodeLlama-7b-Instruct)
+for its exceptional ability in code comprehension. We fine-tuned CodeLlama on our dataset to enhance
+its performance in our specific use cases.
+3.3 INPUT FORMAT
+For GPT-3.5, GPT-4, and Claude 2, the input includes the system prompt, human instruction, and the
+chosen README content.
+To facilitate a user-friendly testing framework, we specifically chose 10 repositories that are easy
+to use as the base bench repositories. We sampled 25-30 examples each from annotated data in 10
+repositories to serve as our test set. We refer to these repositories as the base bench repositories.
+For fine-tuning CodeLlama, we additionally prepared the training set. To validate the effectiveness of
+fine-tuning under two scenarios, we define two setups: the ID (In-Distribution) setting and the OOD
+(Out-of-Distribution) setting.
+Given that we have a total of 14 repositories, 10 of which have already been sampled for the test set,
+we use the left 4 repositories without overlaps with test set.
+For the ID (In-Distribution) setting and OOD (Out-of-Distribution) setting: we sample from the base
+bench repositories (excluding examples from the test set) for the training set. Meanwhile, repositories
+not chosen for the base bench repositories were sampled for the training set in the OOD setup.
+3.4 EVALUATION METRICS
+For evaluation, the output code needs to not only be executable but also aligned with the parameter
+requirements stated in the instruction, we employ two evaluation metrics to assess the output generated
+by the models: Pass@K and Parameter Hit Precision.
+Pass@K refers to the probability that the correctly executed code is generated. Parameter Hit
+Precision(PHP) focuses on how good the model is able to identify and output the code taking care of
+the correct parameters specified in the instruction. During our data annotation process, we instruct
+4
+https://www.nltk.org/api/nltk.tokenize.PunktSentenceTokenizer.html
+5
+https://github.com/openai/tiktoken
+6Due to hardware limitations, CodeLlama’s input is truncated to the first 8k tokens for training and inference.
+7
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+[readme content]:
+DGL is framework agnostic, meaning if a
+deep graph model is a component of an
+end-to-end application, the rest of the
+logics can be implemented in any major
+frameworks, such as PyTorch, Apache
+MXNet or TensorFlow....
+[instruction]:
+I am eager to utilize the Citeseer
+dataset as the training data to empower
+the ARMA Model with the learning rate
+set to a commendably small value of
+0.0001. Additionally, I'd like to
+incorporate 5 stacks into this model.
+Your assistance in formulating the
+necessary code to accomplish this task
+would be of tremendous help.
+[System Prompt]:
+You are given [readme content], you need
+to carefully see [readme content] and
+choose wirte code or script to implement
+my [instruction].
+Please output code or script directly,
+use markdown to output code without
+explanation.
+Model Input
+Evaluation Result
+"python citation.py --dataset Citeseer --lr 0.01 --stacks 5",
+"python main.py --dataset citeseer --lr 0.0001 --stacks 5",
+"dgl-go --model=arma --dataset=citeseer --lr=0.0001 --stacks=5",
+"import dgl\ndataset = dgl.data.CiteseerGraphDataset()\ng =
+dataset[0]\nfrom dgllife.model import DAGNNPredictor ...",
+"python citation.py --dataset Citeseer --lr 0.0001 --num-stacks 5"
+Generated Result
+python citation.py --dataset Citeseer --lr 0.0001 --num-stacks 5
+Gold Output
+FAILED python citation.py --dataset Citeseer --lr 0.01 --stacks 5 wrong argument
+FAILED python citation.py --dataset citeseer --lr 0.0001 --stacks 5 no argument error
+FAILED dgl-go --model=arma --dataset=citeseer --lr=0.0001 --stacks=5 no file error
+FAILED import dgl\ndataset = dgl.data.CiteseerGraphDataset()\n ... wrong execution
+PASSED python citation.py --dataset Citeseer --lr 0.0001 --num-stacks 5 pass
+Figure 4: The illustrative set of input-output pairs, gold output, and execution results, accompanied by precision metrics: Pass@1=0, Pass@2=0, and Pass@5=1. Various colors within the
+instructions signify different parameters.
+annotators to record explicit parameter information contained within each input’s human instruction.
+These parameters are required to remain correct and consistent in the generated code.
+We attempted the above settings to assess the repository using capability and report the results in
+Table 3 and Table 4.
+3.5 EVALUATION ENVIRONMENT
+The necessary models and input samples were downloaded and placed in their respective locations in
+the evaluation environment. All execution environments are publicly released.
+3.6 MAIN RESULTS
+Table 3 shows the results for Pass@K and Table 4 shows the results for PHP. We can observe that:
+1. In the Raw README setting, GPT-4 consistently demonstrates superior performance in
+achieving optimal results in the test set. Claude 2 only outperforms GPT-3.5 in the Pass@1
+6
+* Means evaluated on test set in ML-BENCH.
+Table 3: Pass@K (%) results for experiment in Section3. Pass@1, Pass@2, and Pass@5 scores are
+reported for models on the Raw README, BM25 Retrieval
+Models Oracle Segment Raw README BM25 Retrieval
+Pass@1 Pass@2 Pass@5 Pass@1 Pass@2 Pass@5 Pass@1 Pass@2 Pass@5
+GPT-4 * 39.73 47.94 61.64 28.77 32.25 50.69 20.55 21.92 27.40
+GPT-3.5 * 35.61 41.10 54.79 19.18 30.16 42.47 13.70 21.92 32.88
+Claude 2 * 30.13 41.10 43.84 24.66 31.51 37.99 10.96 15.07 17.84
+GPT-3.5 35.27 51.03 11.22 17.81 28.08 40.76 25.34 19.86 31.84
+Claude 2 23.29 32.53 40.07 22.97 27.39 31.51 11.31 13.70 16.44
+CodeLlama 8.78 12.60 27.86 2.67 6.87 12.98 4.20 7.63 16.79
+CodeLlama-ID 16.78 25.68 35.27 / / / 3.77 8.56 14.38
+CodeLlama-OOD 16.78 21.57 27.74 / / / 2.74 4.11 6.51
+8
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Table 4: Parameter Hit Precision (%). The meaning of Parameter is to use parameter as the basic
+unit of statistics, and Generation is to use output as the basic unit of statistics.
+Models Oracle Segment Raw README BM25 Retrieval
+Parameter Generation Parameter Generation Parameter Generation
+GPT-4 * 93.03 72.82 95.47 81.53 90.24 67.60
+GPT-3.5 92.75 71.71 91.75 68.63 87.58 56.85
+Claude 2 89.76 59.29 91.11 62.19 87.67 55.03
+CodeLlama-ID 81.87 52.22 / / 84.68 53.67
+CodeLlama-OOD 72.71 41.70 / / 68.18 30.83
+Table 5: The BLEU-1 scores between Oracle
+Segments and the BM25 Retrieval content.
+ID-train OOD-train ML-BENCH
+BLEU score 0.0112 0.0087 0.0080
+Table 6: Cutoff date of training data for GPTs
+and Claude 2
+GPT-3.5 GPT-4 Claude 2 CodeLlama
+Datetime 2021.09 2021.09 Early 2023 2023.07
+score in the full set. Additionally, the PHP scores favor GPTs too, further highlighting their
+superior performance.
+2. When presented with an Oracle Segment, the GPT models consistently demonstrate superior
+performance compared to Claude 2. And the experimental results were all significantly
+improved. Providing concise and precise initial code is advantageous for generating model
+code.
+3. Predefined single-segment searches provide limited help for the task and can even have
+unintended consequences. Based on our observations, very few of the BM25-retrieved
+segments fully covered the important segment. This can be attributed to both the lengthy
+Oracle Segment and retrieval errors. We show the BLEU scores between Oracle Segments
+and BM25 searched content in Table 5
+4. CodeLlama’s experimental results consistently exhibit lower values compared to those
+closed-source models. Further discussion on CodeLlama’s results is provided in the subsequent sections.
+4 ANALYSIS
+In this section, we analyze the performance results conducted on the above models, followed by our
+discussion about the difficulties and challenges of this task. We first talk about the data leakage in our
+experiments in Sec. 4.1. In Sec. 4.2, we analyze the performance on each repository and errors for
+GPTs and Claude 2. In Sec. 4.3, we present the performance of one trainable open-source model on
+ML-BENCH.
+4.1 DATA LEAKAGE
+During our experiments, we discovered data leakage concerns due to the huge time span and widelyknown repositories selected. One interesting observation we made while experimenting with the
+BERT library using Claude 2 was that it performed remarkably well (80%) in all settings except
+for the Oracle Segment setting (3.33%). When we used the Raw README setting, Claude 2 was
+unable to generate the correct Bash script as it relied on memorization instead of following human
+instructions. However, in the other two settings where it was provided with the exact code segment,
+Claude 2 deviated from its memorization approach and generated an inaccurate Bash script based on
+the Oracle Segment, resulting in suboptimal outcomes.
+Similar phenomena are observed in the DGL library, where models also tended to deviate from
+explicit instructions, failing to adhere strictly to the "follow the README (Oracle Segment)" system
+prompt when generating Bash scripts. Notably, this issue occurs less frequently in GPT-4. We
+9
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Table 7: This table shows the Pass@5 scores of GPT-3.5 and Claude 2 on Oracle Segment, Raw
+README, and BM25 Retrieval settings in different GitHub repositories.
+Repos GPT 3.5 Claude 2
+Oracle Segment Raw README BM25 Retrieval Oracle Segment Raw README BM25 Retrieval
+DGL 64.00 4.00 12.00 24.00 4.00 4.00
+BERT 20.00 10.00 6.67 3.33 80.00 13.33
+Lavis 66.67 80.00 56.67 50.00 3.33 40.00
+If 70.00 66.67 53.33 40.00 6.67 36.67
+vid2vid 56.67 23.33 30.00 60.00 3.33 0.00
+ESM 65.52 48.28 62.07 68.97 82.76 20.69
+OpenCLIP 33.33 50.00 40.00 3.33 60.00 3.33
+TSL 36.67 26.67 0.00 70.00 6.67 13.33
+EAP 67.86 67.86 31.14 7.14 35.71 0.00
+Py-GAN 33.33 26.67 16.67 70.00 30.00 30.00
+Total 51.03 40.76 31.84 40.07 35.51 16.44
+have systematically classified these occurrences, wherein code generation from memory results in
+inaccuracies, as instances of hallucination errors.
+Data leakage induces models to deviate from the expectation of generating code or scripts of the
+same type as the README provided. Even when explicitly instructed in the PROMPT to adhere to
+the provided information, models tend to overlook this directive. This occurrence carries significant
+implications for both model performance and the potential for error classification.
+We show the updating status for all repositories in Appendix A. And the cutoff date of training data
+for GPTs and Claude 2 in Table 6.
+4.2 CLOSED-SOURCE MODEL RESULTS ANALYSIS
+4.2.1 REPOSITORIES ANALYSIS
+We reported Pass@5 scores of GPT 3.5 and Claude 2 for all the ten repositories in ML-BENCH in
+Table 7, respectively. After that, we discussed these results about the characteristics of the different
+repositories.
+1. In a majority of instances, the Oracle Segment exhibits optimal performance, followed by the
+Raw README, with the BM25 Retrieval consistently ranking as the least effective. Such
+as results on BERT, If, and TSL for GPT-3.5, and vid2vid for Claude 2. The improvement
+between the Raw README setting and the oracle setting is particularly notable including
+Py-GAN, characterized by an extensive README with a higher proportion of textual
+information compared to code details.
+2. When information is scattered across different sections of a README, the Oracle setting
+performs worse than the Raw README setting. The Oracle Segment struggles to accurately
+capture information that is distributed across multiple parts. For instance, when details about
+the model and code are not presented together, the Oracle Segment may face challenges. A
+good example of this is OpenCLIP
+3. We conduct a log analysis to understand the substantial disparity in results between Claude
+2 and GPT-3.5 across the two repositories: Lavis and If in the Raw README setting. In
+Lavis, the model generates Python code based on the README, and Claude 2 occasionally
+makes errors, such as misspelling "from lavis.datasets.builders import load_dataset" as "from
+lavis.datasets import load_dataset" in the documentation. These hallucination errors are
+prevalent in Claude 2 generated code, indicating a potential deviation from strict adherence
+to the provided documentation. If faces more issues with undefined variables in the Python
+code. This might be attributed to the scattered code within this repository.
+4.2.2 ERROR ANALYSIS
+The identified errors in this task fall into four categories: hallucination errors, lack of knowledge
+or information, knowledge manipulation, and syntax errors. We hope that analyzing these types of
+10
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+errors in the context of the task could guide future development efforts for projects utilizing GitHub
+or similar platforms.
+Hallucination errors: These errors include instances when the model has misinterpreted the user’s
+intention, misplaced code script (like creating Python code when it was supposed to generate Bash
+script), or generated random and irrelevant code.
+Lack of knowledge or information: Under the current design, the background information is
+considered slightly weak. Possible types of errors are as follows:
+1. Code Inner Information. The model sometimes lacks sufficient information necessary to
+satisfy the user’s requirements. For instance, this deficiency might involve missing parameter
+names (–lr and learning rate), or unavailable parameter options (it only accepts ’Citeseer’
+when the input given was ’citeseer’).
+2. Model Domain Knowledge. The model sometimes lacks domain-specific knowledge required
+to appropriately handle certain instances. For example, in BERT, the model generated –
+case=True and –model=uncased simultaneously, which can’t be used together.
+3. Grammar knowledge This happens when the model doesn’t correctly identify and handle
+certain command line symbols. For instance, not recognizing that the $ symbol could affect
+execution.
+4. Local data information For certain commands, the model did not supply enough crucial
+parameter information, leading to the inability to find paths and successful execution. This
+error, while less common, was particularly notable in the OpenCLIP library. If the model
+could read local data and find corresponding solutions, its performance could be enhanced.
+Knowledge manipulation: Take BERT, for instance, where the model needed to integrate
+DIR=/model/ and –model_dir = $DIR to form –model_dir =/model (as the user claimed). There
+were also cases where it couldn’t merge "/model_name in /data" into a proper path format like
+/data/model_name. Similar incidents were observed with OpenCLIP.
+Syntax errors: These errors cover instances of incorrect code generation of syntax errors instead of
+hallucination.
+Upon reviewing logs for Raw README settings for GPT-3.5 and Claude-2, we systematically
+categorized the identified error terms in Figure 5. The figure reveals that:
+1. Hallucination errors constitute the largest portion in both models, followed by instances
+where models generate incorrect code, namely Syntax errors. Knowledge manipulation
+represents the smallest share, partially due to the limited dataset content that can capture
+this type of error.
+2. Claude 2 exhibits a relatively higher prevalence of hallucination errors, as discussed earlier,
+stemming from its inclination to generate code based on its internal knowledge rather than
+strictly adhering to the provided README files. In addition to the hallucination errors,
+more errors in both models occurred in writing the wrong code itself, which suggests that
+the model’s foundational ability to modify the code according to the documentation leaves
+should be desired.
+3. It should be noted that, owing to limitations in manpower, multiple errors may have occurred
+simultaneously. However, the calculations presented here only highlight the most significant
+ones, as identified through error logs.
+4.3 OPEN-SOURCE MODEL RESULT ANALYSIS
+4.3.1 RAW CODELLAMA ANALYSIS
+By observing the result in Table 3 and Table 4, our experience with the standard versions of CodeLlama has shown that while it has a good understanding of general code, it struggles to generate Bash
+script or Python code that is specific to our needs. Even though presented with abundant relevant
+information and clear instructions, the generated code still suffers from hallucinations. For instance,
+11
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+0
+10
+20
+30
+40
+50
+60
+70
+Hallucination
+errors
+Lack of knowledge
+or information
+Knowledge
+manipulation
+Syntax errors
+Error Types %
+GPT-3.5
+Claude 2
+Figure 5: Error analysis by human annotation. We analyze 240 errors for GPT 3.5 and 220 errors for
+Claude 2
+when provided with clear instructions and an "Oracle" Bash script directly, CodeLlama still attempts
+to generate Python code based on its understanding.
+4.3.2 FINE-TUNED RESULT ANALYSIS
+We analyze the outcomes with a focus on Oracle Segment and limitations with BM25 Retrieval and
+Raw README settings here.
+Oracle Segment Enhancement: During our experiments, we discovered that the only way to improve
+performance in fine-tuned CodeLlama was by utilizing Oracle Segments. These segments consist
+of code snippets that provide a rich context for the model to learn from, whether in the ID or OOD
+setting. The fine-tuning process enabled CodeLlama to develop a nuanced understanding of these
+Oracle Segments, thereby enhancing its ability to extract and interpret relevant information efficiently.
+BM25 Limitations: One of the primary limitations of the BM25 algorithm is its inconsistency in
+including relevant segments in search results. Predefined single-segment searches often offer limited
+assistance and may even have unintended side effects. These segments are less informative and result
+in poor performance for training. As a result, we have observed a large number of CodeLlama’s
+attempts to generate random code due to insufficient information.
+Raw README Limitations: We didn’t fine-tune CodeLlama under Raw README setting. A
+considerable proportion of READMEs in the test set (45.3%) exceeded the token limit of our
+maximum inference context length (8k), necessitating truncation for inference feasibility. This
+truncation potentially led to extreme loss of critical information, impacting the quality of generating
+results. We show the token number for each repository in Appendix B.
+5 ML-AGENT
+5.1 GAPS BETWEEN MODEL AND HUMAN BEING
+The performance gap, which is clearly evident when comparing the README contents of a repository
+in Raw README and BM25 Retrieval settings, as well as the Oracle Segment model in the Oracle
+Segment setting, underscores the inherent challenge that a singular model faces when attempting to
+navigate a real-world GitHub repository without human intervention in a single iterative step. This
+highlights the complexity of effectively managing such a task and emphasizes the need for further
+research and development to optimize the process.
+Upon this analysis, we have identified the following primary discrepancies between model-generated
+results and actual human utilization of GitHub:
+12
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+Script
+Code
+python xxx.py
+--lr =...
+--batch_size=...
+--dataset=...
+import ...
+from ... import ...
+......
+...... Human
+Instruction
+Can you assist me
+in writing the code
+or script to ....
+ML-AGENT
+Step 1
+Process
+Tool Server
+Step 2 Step 3
+Step 4
+Human
+instruction
+Extract
+keywords
+Keywords
+Keywords
+Retrieve
+GitHub
+repository Urls
+Top5 Urls
+Ranking Urls
+Ranked Urls list
+Ranked repo Urls
+list
+Get repo name and
+repo structure
+Choose a repo
+Retrieve all
+README
+Can fullfill user
+task?
+Return
+ranked README list
+Ranked
+README list
+Choose a README
+Can write code or
+script?
+Return file path
+Extract
+code parameters
+Code
+parameters README
+README
+file
+Repo
+structure
+Top5 Urls Repo names
+Repo
+descriptions
+Human
+instruction
+Can write code or
+script?
+LLMs Retrieval_Repo Generete_Index Extract_Keywords
+Yes
+No
+No
+File
+No
+Repo
+name
+Repo
+structure
+All
+README
+Main
+README
+Yes
+Yes
+All readme ar
+e read
+Code or
+Script
+If Code
+If Script
+Figure 6: Structure of ML-AGENT. ML-AGENT follows a four-step process upon receiving human
+instructions: Step1: Extracting keywords from the instructions and conducting searches on GitHub
+to identify the five most relevant repositories. Step2: Sorting the retrieved GitHub data. Step3:
+Evaluating each retrieved repository to determine its capability to fulfill the task. Step4: Write script
+or code necessary to implement the task.
+- Active Retrieval: In the course of machine learning tasks, human users typically prefer to
+actively retrieve task-specific tools from the Web or directly from GitHub, as opposed to
+creating code solely from existing knowledge.
+- Discrepancies in Data Processing: GitHub users usually perform initial analysis and
+modification of their data. However, models often encounter difficulties, particularly when
+local data formats diverge from the predefined acceptable formats of the GitHub model.
+This problem becomes evident in the benchmark, where models struggle to independently
+retrieve relevant details, such as the path and type of pending local data, which subsequently
+leads to the occurrence of errors due to a lack of knowledge or information in the code.
+- Insufficient Domain Knowledge: The model’s lack of domain knowledge is evident in two
+primary areas. First, the occurrence of syntax errors, highlighting the model’s difficulty in
+conforming to correct programming standards. Second, in the absence of detailed usage
+instructions, the model resorts to its interpretation of domain knowledge to infer the potential
+use of a library, which could lead to inaccuracies.
+- Limited Context Windows and Content Comprehension: Constrained by its window
+length, the model’s ability to navigate through files and understand their content is limited,
+hindering its capability to assist in the composition of code or Bash scripts. Unlike human
+users, models lack the ability to dynamically explore and interpret file information, limiting
+their effectiveness in creating contextually accurate Python code or Bash scripts.
+Consequently, we have designed ML-AGENT, with the explicit intention of mitigating the identified
+discrepancies between LLM and human beings, while also being designed to confront and overcome
+the outlined challenges inherent in this task.
+5.2 DESIGN FOR ML-AGENT
+In the initial stages of designing ML-AGENT, our primary objective was to emulate human thought
+processes when navigating a real GitHub repository. Consequently, we aimed to equip ML-AGENT
+with the capacity to independently retrieve relevant GitHub repositories and rank them in response
+to a query. Following the categorization of these repositories, ML-AGENT is designed to select the
+13
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+sequence in which it reads the README files and any code files present in the repository, mirroring
+the human reading process. Furthermore, it is intended to evaluate whether the provided information
+can fulfil the task that the user wishes to accomplish. To this end, we have structured the agent design
+into four distinct phases, encompassing the processes of retrieval, sorting, planning and generation.
+Moreover, to homogenize the results returned by all LLM-related modules within the agent, we
+incorporate the function calling capabilities of GPT-3.5 and GPT-4.
+Step 1: Retrieval
+In this phase, ML-AGENT extracts keywords from the user’s instructions, including the intended task,
+desired model, and any other relevant factors. These extracted keywords are then used to search for
+related repositories on GitHub, storing the meta information of the top five retrieved repositories.
+Step 2: Sorting
+Next, ML-AGENT utilizes the stored meta information to rank the five selected repositories in
+descending order based on their relevance to the user’s requirements. The agent then memorizes the
+sorted list of these repositories.
+Step 3: Planning
+Following this, the agent reviews the GitHub repositories according to the sorted list and makes
+decisions. For each repository, ML-AGENT initially extracts the directory structure for reference.
+Simultaneously, the agent scans all the README files in the repository and memorizes them. The
+agent then collates the repository’s name, directory structure, main README file, and paths to all
+README files, using this information to make a preliminary judgment. If the repository is considered
+suitable, all README files will be sorted, and the list will be memorized before proceeding to Step
+4. If the repository fails to meet the user’s instructions, the agent refines its selection.
+Step 4: Gereration
+Finally, the agent decides on the next steps based on the contents of the README, the directory
+structure of the repository, and the user’s instructions. These next steps may include directly
+generating the corresponding code or script, deciding to open files to extract code or parameter
+snippets, or rejecting the current README, forming a loop. The loop can only be exited by either
+writing Python code or Bash script, or by returning to Step 3.
+5.3 AGENT RESULTS ANALYSIS
+The results for ML-AGENT are displayed in Table 8. The data indicates that ML-AGENT’s performance is marginally behind the GPT-4 model in the Oracle Segment setting, demonstrating optimal
+performance among the four repositories: DGL, If, ESM, and OpenCLIP.
+Table 8: This table shows the Pass@5 scores of ML-AGENT, GPT 4 and Claude 2 on Oracle
+Segment, Raw README and BM25 Retrieval settings in different GitHub repositories on quarter
+set.
+Repos ML-AGENT GPT 4 Claude 2
+Oracle Segment Raw README BM25 Retrieval Oracle Segment Raw README BM25 Retrieval
+DGL 66.67 66.67 16.67 0.00 33.33 0.00 0.00
+BERT 42.86 42.86 57.14 28.57 14.28 100.00 14.29
+Lavis 50.00 50.00 75.00 50.00 50.00 12.50 37.50
+If 100.00 100.00 100.00 42.86 28.57 14.29 42.86
+vid2vid 12.50 25.00 50.00 25.00 62.50 12.50 0.00
+ESM 87.50 75.00 37.50 62.50 37.50 87.50 12.50
+OpenCLIP 57.14 57.14 42.86 42.86 14.29 57.14 14.29
+TSL 57.14 42.86 42.86 0.00 85.71 14.29 14.29
+EAP 57.14 100.00 71.42 0.00 14.29 42.86 0.00
+Py-GAN 0.00 62.50 12.50 12.50 87.50 25.00 37.50
+Total 52.05 61.64 49.32 27.40 43.84 42.47 24.66
+Taking DGL and ESM as examples, in DGL, the expected Bash script for the model to generate is
+located in a README file within folders. To accurately generate this code, the user must first locate
+the correct README folder. ML-AGENT successfully identifies the file and produces the desired
+14
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+result with a high degree of accuracy. In the ESM repository, we noticed that the agent scanned the
+Jupyter files in folders and constructed executable code based on the contents of these Jupyter files.
+Nevertheless, there are repositories where ML-AGENT’s performance is sub-optimal, such as PyGAN and Vid2Vid. In the case of Py-GAN, our agent examined the Python files referenced by
+README, as opposed to directly writing Bash script files with adequate information. For Vid2Vid,
+the agent’s "Generation PHP score" was only 0.5185, significantly lower than the average score of
+0.8114 for all repositories. This poor performance can be attributed to incorrect parameter generation
+and erroneous Bash script.
+In light of these observations, we believe that ML-AGENT effectively mirrors human behavior
+in selecting and reading files. However, it does exhibit some weaknesses, such as its inability to
+accurately select files or halt the reading of new files when the requirements have been met.
+6 RELATED WORK
+6.1 AGENT
+The rapid advancement of usages (Yao et al. (2023); Li et al. (2023); Wang et al. (2023c); Cai et al.
+(2023)) for large language models (Brown et al. (2020);Shao et al. (2022); Zhao et al. (2023a)) has
+propelled the evolution of intelligent agents within the realm of artificial intelligence (Zhao et al.
+(2023b); Xi et al. (2023)). The development of agents based on LLMs encompasses two primary
+facets: general agents and task-specific agents.
+General agents. General agents refer to agents that are not specifically assigned a predefined task
+during construction. This category of agents demonstrates the capability to autonomously undertake
+a diverse range of complex tasks through mechanisms such as planning, reaction, memorization,
+reasoning, and the establishment of communication protocols (Yao et al. (2023), Wang et al. (2023b)),
+like AutoGPT (Gravitas (2023)), XAgent (Team (2023)), AgentVerse (Chen et al. (2023b)), HOLMES
+(Chen et al. (2023a)) and MetaGPT (Hong et al. (2023)).
+Task-specific agents. Task-specific agents pertain to agents meticulously engineered for the explicit
+purpose of undertaking a specific task. Illustrative instances encompass MindAgent (Gong et al.
+(2023)), designed to augment collaborations between humans and NPCs in games, and Voyager
+(Wang et al. (2023a)), tailored for playing Minecraft.
+6.2 CODE GENERATION
+Code generation has been a subject of longstanding inquiry within the field of NLP, and it has
+demonstrated activity in the formulation of methodologies and the establishment of benchmarks
+(Chen et al. (2021), Christopoulou et al. (2022), Orlanski et al. (2023), Wang et al. (2023d), Cassano
+et al. (2022); Tang et al. (2023b); Tang et al. (2023a)). There are two avenues for code generation:
+one involves advancing the capability for straightforward code generation, while the other leverages
+code generation for facilitating tool usage.
+Straightforward Code generation. The objective of straightforward code generation is to produce
+code snippets that fulfill user requirements or contribute to code completion (Feng et al. (2020), Li
+et al. (2022)), encompassing the development of foundational models for code generation (Zheng
+et al. (2023), AI (2023)).
+Tool-using. Tool-using code generation empowers the model’s ability of tool calling, enabling it to
+acquire the proficiency to invoke tools when engaging with the user, like ToolLLM (Qin et al. (2023)),
+Gorilla (Patil et al. (2023)) and HuggingGPT Shen et al. (2023).
+7 CONCLUSION
+In this paper, we introduced ML-Bench, a comprehensive benchmark designed to evaluate the
+effectiveness of utilizing existing functions in available packages for machine learning tasks. Our
+benchmark serves as a critical tool for assessing the efficiency and adaptability of various methods in
+15
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+real-world scenarios. Furthermore, we proposed ML-Agent, an innovative agent capable of reading
+files and writing scripts to effectively fulfill user needs. This agent represents a significant step
+forward in automating and streamlining machine learning workflows, thereby reducing the barrier to
+entry for users with varying levels of expertise. Our extensive evaluations, conducted across different
+settings and models within ML-Bench, demonstrate the robustness and versatility of ML-Agent.
+These evaluations not only validate the effectiveness of our approach but also provide valuable
+insights into the potential areas for future research and development in this domain. We believe that
+ML-Bench and ML-Agent together make a substantial contribution to the field of machine learning,
+offering researchers and practitioners new tools to advance the state of the art in automated machine
+learning processes.
+8 LIMITATION
+Our study, while comprehensive within its scope, is subject to certain limitations that stem primarily
+from linguistic and data source constraints.
+Linguistic Limitation - English as a Working Language We exclusively focused on English
+for our analyses and model development. This choice, while pragmatic due to English’s prevalence
+in scientific literature and technical documentation, inherently limits the generalizability of our
+findings. English, as a language, possesses unique syntactic and semantic structures that may not
+be representative of other languages. Consequently, the applicability of our results to non-English
+contexts is uncertain. This linguistic limitation also restricts the diversity of perspectives and cultural
+nuances that non-English documents could offer. Such perspectives are particularly crucial in fields
+like Natural Language Processing (NLP) and Machine Learning (ML), where cultural and contextual
+understanding significantly influences model performance and bias.
+Data Source Limitation - Reliance on GitHub Repositories in English Our reliance on GitHub
+repositories with documents exclusively in English introduces a selection bias. GitHub, while a rich
+source of open-source projects and documentation, may not comprehensively represent the broader
+landscape of software development practices and trends globally. This choice potentially overlooks
+significant contributions and insights from non-English-speaking communities. These communities
+often host their work on other platforms or use other languages for documentation, leading to a
+skewed understanding of global software development practices. Furthermore, this limitation might
+impact the development of tools and models that are tailored for a more diverse set of programming
+environments and community needs. The underrepresentation of non-English repositories could
+lead to models that are less effective or inclusive when applied in multilingual or culturally diverse
+contexts.
+Methodological Limitation - Relying on Pre-built Machine Learning Packages In our methodology, we opted to utilize existing machine learning packages instead of developing algorithms from
+scratch. While this approach allowed us to leverage well-established, tested, and optimized tools, it
+also introduces certain constraints. Dependence on pre-built packages means our work is confined to
+the capabilities and limitations of these tools. This reliance could limit our ability to fully explore
+novel or unconventional approaches that might be possible with custom-built algorithms. Moreover,
+this choice potentially impacts the reproducibility and customization of our findings. Researchers
+who seek to build upon our work may encounter similar constraints imposed by the pre-built packages
+we utilized. These limitations have the potential to hinder innovation and adaptation in different
+contexts or for specific use cases.
+Scope Limitation - Tasks Limited to README File Descriptions Our research methodology
+strictly adheres to tasks and applications as described in the README files of the GitHub repositories.
+This approach ensures clarity and focus but also restricts the scope of our study to pre-defined
+tasks. By adhering strictly to the specified tasks, our study may overlook potential applications
+or challenges that are not explicitly documented in the README files. This limitation can result
+in a narrower understanding of the tools and models we examined, as it fails to explore their full
+potential and applicability. The reliance on README descriptions also assumes that these documents
+16
+ML-Bench: Large Language Models Leverage Open-source Libraries for Machine Learning Tasks
+comprehensively and accurately reflect all relevant aspects of the repositories, which may not always
+be the case. Important tasks or nuances might be undocumented or underrepresented in these files.
+9 ETHICS STATEMENT
+In conducting our research, we have carefully considered the ethical implications of our work,
+particularly in the realms of data annotation and related activities. Our methodologies and processes
+have been meticulously designed to ensure that they are free from ethical concerns. We affirm that
+our research practices, including the handling of data, have been conducted with the utmost integrity
+and in compliance with ethical standards.
+Throughout the study, we have not engaged in any practices that could raise ethical issues in data
+annotation or other aspects of our work. Our approach has been guided by principles that prioritize
+respect for data integrity, transparency in our methods, and adherence to established ethical guidelines.
+We have taken necessary measures to ensure that our research does not inadvertently contribute to or
+perpetuate any form of bias or ethical misconduct.
+Our team remains committed to upholding the highest standards of ethical research, ensuring that our
+work contributes positively to the field without compromising ethical values or responsibilities.
