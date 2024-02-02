@@ -1,0 +1,670 @@
+LongAlign: A Recipe for Long Context Alignment
+of Large Language Models
+Yushi Bai‡†, Xin Lv§
+, Jiajie Zhang‡†, Yuze He‡
+, Ji Qi‡†
+,
+Lei Hou‡
+, Jie Tang‡
+, Yuxiao Dong‡
+, Juanzi Li‡
+‡Tsinghua University §Zhipu.AI
+Abstract
+Extending large language models to effectively
+handle long contexts requires instruction finetuning on input sequences of similar length. To
+address this, we present LongAlign—a recipe
+of the instruction data, training, and evaluation for long context alignment. First, we construct a long instruction-following dataset using Self-Instruct. To ensure the data diversity,
+it covers a broad range of tasks from various
+long context sources. Second, we adopt the
+packing and sorted batching strategies to speed
+up supervised fine-tuning on data with varied
+length distributions. Additionally, we develop
+a loss weighting method to balance the contribution to the loss across different sequences
+during packing training. Third, we introduce
+the LongBench-Chat benchmark for evaluating
+instruction-following capabilities on queries of
+10k-100k in length. Experiments show that
+LongAlign outperforms existing recipes for
+LLMs in long context tasks by up to 30%, while
+also maintaining their proficiency in handling
+short, generic tasks. The code, data, and longaligned models are open-sourced at https:
+//github.com/THUDM/LongAlign.
+1 Introduction
+Large language models (LLMs) with large context
+windows facilitate tasks such as summarization,
+question answering on long text and code (Bai et al.,
+2023a). Importantly, they may form the foundational support for life-long conversations and complex agent scenarios (Xiao et al., 2023; Liu et al.,
+2023). Existing works to build long-context LLMs
+predominantly focus on context extension (Chen
+et al., 2023a; Xiong et al., 2023; Peng et al., 2023),
+that is, position encoding extension and continual
+training on long text.
+In this work, we instead focus on the perspective of long context alignment, i.e., instruction
+fine-tuning LLMs to handle long user prompts.
+†Work done when YB, JZ, and JQ interned at Zhipu.AI.
+Figure 1: Test results on LongBench-Chat, which contains real-world queries of 10k-100k in length1
+.
+However, several challenges are required to address. First, there is an absence of long instructionfollowing datasets for supervised fine-tuning (SFT),
+and by extension the lack of methods for constructing such data. Second, the varied length distribution of long-context data drastically reduces the
+training efficiency of traditional batching methods
+in a multi-GPU setup, as GPUs processing shorter
+inputs have to stay idle until those handling longer
+inputs complete their tasks. Third, there is a crucial
+need for a robust benchmark to evaluate LLMs’
+long-context capacities against real-world queries.
+To address them, we present the LongAlign
+recipe, covering data, efficient training, and evaluation, respectively. Data-wise, to construct a diverse long instruction-following dataset, we collect
+long sequences from nine sources and use SelfInstruct (Wang et al., 2022) to generate 10k instruction data of 8k-64k length.
+Training-wise, to address the inefficiency under uneven batching, we adopt the packing strategy (Krell et al., 2021) that packs sequences to1LongAlign-6B-64k, LongAlign-7B-64k and LongAlign13B-64k are trained based on ChatGLM3-6B, Llama-2-7B
+and Llama-2-13B, respectively.
+1
+arXiv:2401.18058v1 [cs.CL] 31 Jan 2024
+gether up to the maximum length before dispatching them to GPUs. However, we identified a bias
+in loss averaging during this packing training, as
+packs containing different numbers of sequences
+are assigned equal weight in the final loss calculation. To mitigate this bias, we propose a loss
+weighting strategy to balance contributions to the
+loss across different sequences. In addition, we
+introduce a sorted batching method that groups sequences of similar lengths to reduce the intra-batch
+idle time.
+Evaluation-wise, we develop LongBench-Chat,
+a benchmark compromising open-ended questions
+of 10k-100k length annotated by Ph.D. students.
+It covers diverse aspects of instruction-following
+abilities such as reasoning, coding, summarization,
+and multilingual translation over long contexts.
+GPT-4 (OpenAI, 2023b) is employed to score the
+machine-generated responses based on our annotated groundtruths and few-shot scoring examples.
+Extensive experiments show that LongAlign effectively aligns models to handle contexts of up to
+64k tokens in length while maintaining their performance on general tasks without degradation. In
+addition, we have the following findings:
+• Impact of Data Quantity and Diversity: Both
+the quantity and the diversity of the long instruction data significantly influence the aligned
+model’s ability to handle long contexts, impacting final performance by up to 30%.
+• Benefits of Long Instruction Data: The amount
+of long instruction data positively affects the performance on long-context tasks while does not
+hurt the models’ short-context handling capacities.
+• Effectiveness of Training Strategies: The packing and sorted batching strategies adopted can
+accelerate training by over 100% without performance compromise. Furthermore, the proposed
+loss weighting technique improves long context
+performance by 10%.
+2 Related Work
+Long Context Scaling. Long context scaling aims
+to expand the limited context length of existing
+LLMs to support long context tasks (Xiong et al.,
+2023). The current methods for long context scaling can be divided into two categories: those that
+require fine-tuning or continual training on longer
+sequences and those that do not. Methods that do
+not require fine-tuning often employ techniques
+such as sliding window attention (Han et al., 2023;
+Xiao et al., 2023) or neighboring token compression (Jiang et al., 2023; Zhang et al., 2024; Jin et al.,
+2024) to handle the positional O.O.D. problem in
+attention computation for long contexts. These
+methods, although capable of extending the context
+length of LLMs in a plug-and-play manner, still
+cannot match the performance of the fine-tuned
+approaches. Prominent fine-tuned approaches for
+long context scaling (Chen et al., 2023a; Peng et al.,
+2023; Xiong et al., 2023; Chen et al., 2023b; Zhu
+et al., 2023; Fu et al., 2023) typically involve position encoding extension and continual pretraining
+on longer sequences.
+LLM Alignment. Following the previous steps
+of long context scaling, it is vital to also align the
+model with instruction-following data to ensure
+that it can interact with various user requests in a
+chat interface (Wang et al., 2023). This phase, often
+referred to as supervised fine-tuning or instructiontuning, has been extensively studied in short context scenarios (Wang et al., 2022; Taori et al., 2023;
+Wang et al., 2023; Tunstall et al., 2023). However, the introduction of long sequences presents
+unique challenges in terms of data, training methods, and evaluation for alignment. Xiong et al.
+(2023) proposes generating long instruction data
+by concatenating short instruction data, yet their
+dataset and model weight are not open-sourced.
+On the other hand, while Chen et al. (2023b) has
+made their long instruction data, LongAlpaca-12k,
+available and employed LoRA (Hu et al., 2022) for
+efficient fine-tuning, it lacks in-depth discussion
+and comparative analysis of the influence of data
+and training methodologies. Our work aims to find
+an optimal solution for supervised (full parameter)
+fine-tuning on long context with full attention, by
+tuning data, training methods, and evaluating the
+aligned models on a wide range of tasks.
+3 LongAlign
+In this section, we discuss the methodology in LongAlign, involving the data construction process,
+training method, and evaluation benchmark.
+3.1 Preliminary
+Large language models can learn alignment by supervised fine-tuning on high-quality pairs of instruction x and response y (Ouyang et al., 2022;
+Chung et al., 2022). During training, the instruction
+2
+Task type
+(summary)
+Long Doc
+Generated
+Task & Ans
+[{“role”: “user”, “content”: Long Doc + Task},
+{“role”: “assistant”, “content”: Answer}]
+User:
+In my younger and more vulnerable years my father gave me
+some advice that I've been turning over in my mind ever since.
+…
+Given the above text, please propose 5 English questions that
+require summarization or integration from multiple parts,
+make sure they are diverse and cover all parts of the text, in
+the following format: “1: ”, “2: ”, ...
+Assistant:
+1. Summarize the plots between Gatsby and Daisy…
+Figure 2: Data construction example.
+and response are typically concatenated to form a
+sequence [x, y], which is then processed through an
+auto-regressive language model π to maximize the
+probability Pπ(y|x). The loss is similar to a language modeling loss, while only accounting for the
+loss associated with the tokens in y (target tokens):
+L([x, y]) = −
+X
+|y|
+i=1
+log Pπ(yi
+| [x, y<i]). (1)
+3.2 Dataset Construction
+Long instruction data typically involves a long context material, such as a book, an extensive document, or a lengthy code, accompanied by a task
+query that requires summarizing, reasoning, or
+computing based on the material. During construction, we first collect long articles and documents
+from 9 varied sources, covering books, encyclopedias, academic papers, codes, etc. We then employ
+Claude 2.1 (Anthropic, 2023) to generate tasks and
+answers according to a given long context, as illustrated in Figure 2. To foster a diverse range of generated tasks, we incorporate task type descriptions
+into the prompts, such as queries for summaries,
+information extraction, reasoning, etc. Using this
+methodology, we create tasks and answers for 10k
+lengthy texts, yielding a total of 10k instances of
+supervised data, of which 10% is in Chinese. The
+length of these data ranges from 8k to 64k, measured by ChatGLM tokenizer (Zeng et al., 2023)
+due to its higher compression rate for Chinese characters. Details regarding the prompts and the data
+construction process can be found in Appendix A.
+3.3 Efficient Long-Context Training
+To ensure that the model retains the ability to handle both long and short texts (general capability)
+after SFT, we mix the long instruction data with a
+general instruction dataset for training. The mixture of a large amount of general short data with a
+relatively smaller amount of long instruction data
+results in a long-tail data length distribution. As
+shown in Figure 3 left, the majority of the data falls
+within the 0-8k length range, while the remaining
+data is fairly evenly distributed in the 8k-64k length
+interval. Under this distribution, during training,
+a data batch typically contains mostly short data,
+yet these batches also include a few longer texts
+which necessitate much more computation times,
+resulting in considerable idle times. To minimize
+these idle times, the most effective approach is to
+concatenate or sort the data in a manner that ensures a more uniform length and computational
+time within each batch. Bearing this in mind, we
+explore two training methods, namely packing and
+sorted batching.
+Packing. It involves concatenating data of varying lengths together until reaching the maximum length. The resulting packed data, whose
+lengths are generally close to the maximum length,
+are then batched and processed on multi-GPUs.
+This approach effectively minimizes the idle time
+within each batch, as depicted in the upper right
+of Figure 3. Additionally, to prevent crosscontamination between different sequences within
+the same pack during self-attention calculation,
+we pass a list containing the starting and ending
+positions of different sequences and utilize the
+flash_attn_varlen_func from FlashAttention 2 (Dao et al., 2022; Dao, 2023), which supports
+efficient computation of block diagonal attention
+(see Appendix B for more details). It requires less
+computation and IO time compared to the traditional use of a 2D attention mask.
+However, we notice that the packing strategy
+leads to a bias towards longer sequences and sequences containing more target tokens. This is
+because different packs, each contributing equally
+to the final loss, contain varying numbers of sequences with different numbers of target tokens.
+Consequently, when calculating the mean loss for
+each batch, sequences in packs with fewer sequences (typically the longer ones) or those containing more target tokens, have a greater influence
+on the final loss. Formally, consider M sequences
+packed into a batch of K packs where the i-th pack
+consists of the sequences with indices in [Pi−1, Pi),
+thus it holds that P0 = 1, PK = M + 1. Let Li
+denote the total summation of loss over Ni
+target
+tokens in the i-th sequence. If we weigh each se3
+…
+Device1
+Device2
+Idle time
+Device…
+Packing
+Training time
+Sorted batching
+…
+…
+… …
+Batch 1 Batch 2
+block diagonal attention mask
+loss weighting
+×
+�
+���
+# packs in the batch
+# sequences in the batch
+# target tokens in
+current sequence �
+Naïve batching
+Sequence Length
+Number
+Length distribution
+��
+Figure 3: Under a long-tailed data length distribution, packing or sorted batching can reduce idle time and speed up
+the training process. Loss weighting is required during packing to balance the loss contribution across sequences.
+quence equally, the loss should be
+L =
+1
+M
+X
+M
+i=1
+Li
+Ni
+, (2)
+while the loss calculated under packing is
+L
+′ =
+1
+K
+X
+K
+k=1
+(
+P
+Xk−1
+i=Pk−1
+Li/
+P
+Xk−1
+i=Pk−1
+Ni) ̸= L. (3)
+Compared with Eq. 2, this equates to assigning a
+weight of (Nj/
+PPk−1
+i=Pk−1
+Ni) to sequence j in the
+loss, i.e., in favor of sequences with more target
+tokens and sequences in smaller packs. To address
+this inequality, we propose to scale the loss in the
+i-th sequence by K/(NiM) and instead take the
+sum of the scaled loss on each pack, which results
+in an equal loss to Eq. 2:
+L
+′ =
+1
+K
+X
+K
+k=1
+(
+P
+Xk−1
+i=Pk−1
+LiK
+NiM
+) = 1
+K
+X
+M
+i=1
+LiK
+NiM
+= L.
+(4)
+As demonstrated in our experimental section, the
+loss weighting strategy results in a 10% improvement in downstream tasks.
+Sorted batching. We also consider an efficient
+sorted batching strategy for training (lower right
+of Figure 3). To ensure that the sequences within
+each batch are of similar lengths, we sort the data
+by length and select a random consecutive group
+of data for each batch, with no repetition. However,
+this strategy inevitably introduces a bias in the data
+distribution across different batches, where batches
+consist either of all long sequences or all short
+sequences. This can be potentially disastrous for
+SGD optimization. In our experiments, we observe
+that sorted batching significantly accelerates the
+process without a noticeable negative impact on
+performance. This might be attributed to our use
+of large gradient accumulation steps and the strong
+adaptability of the optimizer.
+3.4 LongBench-Chat
+Although there are existing benchmarks for evaluating LLMs’ long context understanding (An et al.,
+2023; Bai et al., 2023a; Li et al., 2023b), they do
+not focus on assessing their instruction-following
+capability under long context. Furthermore, their
+reliance on automatic metrics for evaluation limits
+the assessment of aligned models’ longer and more
+diverse outputs to real-world queries, and how their
+responses align with human preference.
+To this end, we propose LongBench-Chat, which
+includes 50 long context real-world queries ranging from 10k to 100k in length, covering various
+key user-intensive scenarios such as document QA,
+summarization, and coding. It consists of 40 tasks
+in English and 10 in Chinese. To ensure the evaluation truly reflects the model’s ability to follow
+long context instructions, we avoid using popular
+long texts that are likely to have been seen and
+memorized by the model during pretraining. We
+also avoid posing questions that the model could
+answer without reading the long text.
+For evaluation, following previous works that
+have shown the effectiveness of using LLM as an
+evaluator (Bai et al., 2023b; Zheng et al., 2023; Ke
+et al., 2023), we employ GPT-4 (OpenAI, 2023b)
+to score the model’s response in 1-10 based on a
+given human-annotated referenced answer and fewshot scoring examples for each question. We only
+pass the short query (without the long document)
+to the evaluator, as currently there is no model
+capable of evaluating the quality of responses under
+long context inputs. To ensure that the evaluator
+can make informed judgments based solely on the
+groundtruth and few-shot scoring examples, we
+steer clear of overly open-ended questions, such as
+“Write a poem based on the preceding text”.
+To validate the reliability of using GPT-4 as an
+evaluator on LongBench-Chat, we conduct a hu4
+Human GPT-4 GPT-4+Few-shot
+Spearman (ρ) 0.817 0.788 0.844
+Kendall (τ ) 0.694 0.656 0.716
+Table 1: Inter-annotator correlations; correlations between GPT-4 (w/ and w/o Few-shot) and human.
+man evaluation study (more details in Appendix C).
+In Table 1, we present the correlation between GPT4’s assessments using zero-shot prompting, which
+involves only the referenced answer, and its evaluations with additional few-shot scoring examples,
+compared to crowdsourced human judgments. We
+also show the inter-annotator correlation in the first
+column. We find that with few-shot prompting,
+GPT-4’s correlation with human annotations not
+only aligns but also surpasses the level of agreement among human annotators, proving the reliability of such a metric on LongBench-Chat. We
+further discover that the overall average scores (1-
+10) obtained using GPT-4+Few-shot differ by an
+average of 0.1 or less from the scores given by
+human experts. Additionally, we do not observe
+a significant bias in GPT-4’s scoring towards the
+length of responses — in fact, it even penalizes
+excessively lengthy responses.
+Leaderboard. Figure 1 reports the test results of
+current long context (16k+) instruction fine-tuned
+models (chat models) and our most competent
+models trained with LongAlign on LongBenchChat. We include API-based Commercial models: GPT-4-1106-preview (OpenAI, 2023a) (GPT4 Turbo), GLM-4-128k2
+, and Claude-2.1 (Anthropic, 2023); as well as open-sourced models:
+InternLM2-7b-200k, InternLM2-20b-200k (Team,
+2023), ChatGLM3-6B-32k (Du et al., 2022; Zeng
+et al., 2023), Vicuna-7b-v1.5-16k (Zheng et al.,
+2023), Orion-14b-LongChat (Chen et al., 2024),
+LongChat-7b-v1.5-32k (Li et al., 2023a), and
+Mixtral-8x7b-Instruct-v0.2 (Jiang et al., 2024).
+Note that we employ middle truncation for inputs
+surpassing the model’s context window. Our evaluation result reveals that the performance of current
+open-sourced models still significantly lags behind
+commercial models, which partially attributed to
+the scale difference between these models. Additionally, we observe that models with a context
+length of 32k or less tend to underperform on
+LongBench-Chat, indicating that a longer context
+window is necessary to complete these long tasks.
+2
+https://open.bigmodel.cn/pricing
+4 Experiments
+In this section, we aim to answer the following
+research questions through a series of experiments:
+RQ1. During SFT, how does the quantity and diversity of the long instruction data influence the
+model’s performance in downstream tasks.
+RQ2. Whether incorporating long instruction data
+during training affects the model’s general capabilities and their instruction-following / conversational
+abilities in short context scenarios.
+RQ3. The impact that the packing and sorted batching training methods have on the training efficiency
+and the final performance of the models.
+We also incorporate discussions on the scalability
+of LongAlign on model size and context length,
+and the learning curve in long context alignment.
+4.1 Experimental Setup
+Data. To maintain the model’s general capabilities
+and its proficiency in following short instructions,
+we utilize ShareGPT (Chiang et al., 2023) (empty
+assistant responses are filtered out) as the source
+of short instruction data in our training data. To
+compare the impact of different aspects of long
+instruction data on model training, we incorporate
+the following four suites of long instruction data
+in our experiment. ‘LongAlign-0k’, ‘LongAlign5k’, and ‘LongAlign-10k’: 0, 5k, and 10k instances
+of LongAlign data, constructed according to the
+procedure in Sec 3.2; ‘LongAlpaca-12k’: 12k data
+from the LongAlpaca dataset (Chen et al., 2023b).
+LongAlpaca includes 9k long QA data and 3k short
+QA data, where the long QA data is generated
+based only on academic papers and books, offering less diversity compared to our LongAlign data.
+We use this dataset to compare the impact of the
+diversity of long instruction data on model training.
+Model. We include three model variants, namely
+ChatGLM3-6B (Du et al., 2022; Zeng et al., 2023),
+Llama-2-7B, and Llama-2-13B (Touvron et al.,
+2023) (all base models). Given their 8k and 4k context windows, we first perform context extension
+to extend their context window to 64k, resulting in
+ChatGLM3-6B-64k, Llama-2-7B-64k, and Llama2-13B-64k. This involves expanding the base frequency b of the RoPE position encoding (Su et al.,
+2024) by 200 times (from 10,000 to 2,000,000) and
+continual training on pretraining data with lengths
+under 64k, for a total of 10 billion tokens3
+.
+3Continual training on 10B tokens is sufficient for context
+extension, as suggested in Fu et al. (2023).
+5
+Training Data Long Tasks Short Tasks
+(Long) LongBench-Chat S-Doc QA M-Doc QA Summ MT-Bench ARC HellaSwag TruthfulQA MMLU
+LongAlign-0k 3.73 58.7 41.1 38.4 5.34 50.3 74.7 51.6 45.5
+LongAlign-5k 5.97 61.8 42.1 42.0 5.51 50.3 75.1 52.5 46.6
+LongAlign-10k 6.21 64.0 44.4 44.2 5.5 50.5 74.9 52.5 45.5
+LongAlpaca-12k 4.46 65.8 45.6 44.1 4.93 51.5 75.4 53.2 47.1
+Table 2: Performance of ChatGLM3-6B-64k after training on different quantities and types of long instruction data.
+SFT on 0k long data SFT on 5k long data
+SFT on 10k long data SFT on 12k longalpaca data
+Figure 4: 1k-60k Needle test performance of ChatGLM3-6B-64k trained on different suites of long data
+mixed with ShareGPT.
+Training. All models are trained with 8xA800
+80G GPUs and DeepSpeed+ZeRO3+CPU offloading (Rasley et al., 2020). The models can be trained
+with a maximum length of 64k tokens without GPU
+memory overflow. Consequently, we set the maximum length of the training data to 64k, with any
+data exceeding this length being truncated from the
+right. For packing training, each pack consists of
+12 sequences on average, we set the total batch size
+to 8, resulting in a global batch size of 96. For a
+fair comparison, we set the batch size to 8, with
+a gradient accumulation step of 12 for other nonpacking training methods. We train 2 epochs on
+the training data (approximately 1500-2000 steps).
+Evaluation. We involve both long context tasks
+and short context tasks in evaluation. In both long
+and short scenarios, we consider tasks that evaluate the instruction-following and conversational
+abilities, as well as tasks that assess general capabilities. For long context tasks, we use our
+proposed LongBench-Chat to evaluate the models’ long context alignment proficiency and employ
+LongBench (Bai et al., 2023a) to test the model’s
+general long context understanding abilities. LongBench is a bilingual, multi-task long context benchmark. We conduct evaluations on three types of
+tasks within it: Single-Doc QA, Multi-Doc QA,
+and Summarization. Since the aligned models typically produce longer responses, instead of using the
+original metrics (ROUGE, F1) to score the models’
+replies, we use GPT-4 to rate the model’s outputs
+based on their alignment with the groundtruth answers on LongBench. For short context tasks, we
+use MT-Bench (Zheng et al., 2023), a multi-turn
+chat benchmark, to measure the models’ ability to
+follow short instructions. We also evaluate on the
+general tasks on Open LLM Leaderboard (Beeching et al., 2023), including ARC (Clark et al.,
+2018), HellaSwag (Zellers et al., 2019), Truthful
+QA (Lin et al., 2022), and MMLU (Hendrycks
+et al., 2021). We follow the evaluation settings
+in the Open LLM Leaderboard and utilize lmevaluation-harness framework (Gao et al., 2023)
+for evaluation on these tasks. To ensure the most
+stable evaluation results, we use GPT-4 to score
+twice on LongBench-Chat and MT-Bench, and average these scores to obtain the final score.
+4.2 Influence of Data
+We conduct SFT on ChatGLM3-6B-64k using
+ShareGPT data mixed with different suites of long
+instruction data. All models except LongAlign-0k
+are trained using the more efficient packing strategy with loss weighting. The evaluation results are
+reported in Table 2. For LongBench-Chat and MTBench, the reported results are averaged over GPT4’s rating (1-10) across all test instances, while
+results on other datasets are normalized between 0-
+100. We also conduct the “Needle in A HayStack”
+experiment4
+(result visualization in Figure 4) to test
+the model’s ability to utilize information from 10
+different positions within long contexts of varying
+lengths between 1k-60k. Specifically, this task asks
+for the model to retrieve a piece of fact (the ‘needle’) that is inserted in the middle (positioned at a
+specified depth percent) of a long context window
+4
+https://github.com/gkamradt/LLMTest_NeedleInAHaystack
+6
+Training Method Long Tasks Short Tasks
+LongBench-Chat S-Doc QA M-Doc QA Summ MT-Bench ARC HellaSwag TruthfulQA MMLU
+ChatGLM3-6B-64k
+Naïve batching 5.87 65.4 45.0 44.8 5.61 50.7 74.7 52.8 46.0
+Sorted batching 5.4 66.2 46.3 43.7 5.76 51.3 74.8 51.9 46.3
+Packing 5.76 65.0 45.1 42.8 5.64 50.9 74.8 50.5 47.2
+Packing+loss weighting 6.21 64.0 44.4 44.2 5.5 50.5 74.9 52.5 45.5
+Llama-2-7B-64k
+Naïve batching 5.95 62.8 42.7 41.6 5.52 48.9 74.8 45.3 43.6
+Sorted batching 6.38 63.4 42.2 41.3 5.51 49.5 74.8 48.0 44.3
+Packing 5.89 61.7 40.4 42.0 5.58 48.1 74.9 46.1 43.9
+Packing+loss weighting 6.10 60.8 41.3 43.1 5.60 48.4 74.5 47.4 43.3
+Table 3: Performance of ChatGLM3-6B-64k and Llama-2-7B-64k under different training methods.
+(the ‘haystack’). We summarize our key findings
+on the influence of data as follows.
+1. More long instruction data enhances the performance in long tasks, and without compromising the performance in short tasks. Comparing the performance of LongAlign-0k, LongAlign5k, and LongAlign-10k, we observe that as the
+amount of long instruction data increases, there
+is a consistent improvement in the model’s performance across all long tasks. Meanwhile, intriguingly, its performance on short tasks remains
+comparable to when it is trained solely on short
+instructions. Additionally, given the inferior performance of LongAlign-0k in long tasks (especially on
+LongBench-Chat), this also indicates that merely
+performing context extension on the base model is
+insufficient to ensure good performance on downstream long tasks. It is necessary to incorporate a
+substantial amount of long data covering various
+lengths during SFT. Moreover, the needle test result also suggests that more long data enhances the
+model’s ability to utilize information from different
+positions within long texts, resulting in a decrease
+of the model’s retrieval error.
+2. Diversity of long instruction data is beneficial for the model’s instruction-following abilities. LongAlign-10k shows significantly better
+results in long and short instruction-following
+tasks (LongBench-Chat and MTBench), compared
+to LongAlpaca-12k. Meanwhile, LongAlpaca12k slightly outperforms LongAlign-10k on LongBench. This is primarily due to its superior performance on the 2WikiMQA (Ho et al., 2020) and
+NarrativeQA (Kocisk ˇ y et al. ` , 2018) datasets, which
+are based on Wikipedia and novels, bearing more
+resemble to the source of the instruction data in
+LongAlpaca-12k.
+ChatGLM3-6B-64k Llama-2-7B-64k Llama-2-13B-64k
+0
+20
+40
+60
+80
+100
+120
+Training time (h)
+45.4
+67.2
+117.2
+20.5 23.4
+41.2
+19.1 23.3
+44.5
+Naïve batching
+Packing
+Sorted batching
+Figure 5: Training time (hrs) on 8xA800 80G GPUs
+under different training methods.
+4.3 Impact of Training Methods
+We compare different training methods on
+ChatGLM3-6B-64k and Llama-2-6B-64k, including naïve batching, packing (w/ and w/o loss
+weighting), and sorted batching, to assess their
+impact on training efficiency, as well as their influence on downstream task performance.5 All
+models are trained on LongAlign-10k. Figure 5
+displays a comparison of the training time required
+for each method. Table 3 presents the performance
+on downstream tasks. Our findings are as follows.
+1. Packing and sorted batching double the
+training efficiency while exhibiting good performance. From Figure 5, we can see that the
+training efficiency of packing and sorted batching is comparable, both requiring less than half
+the time needed under naïve batching. Additionally, according to table 3, models trained with the
+two efficient methods perform comparably to those
+trained with naïve batching on both long and short
+tasks. We also find that the effectiveness of these
+two training methods varies with different models.
+5Naïve batching and sorted batching consume more GPU
+memory compared to packing, due to their use of gradient
+accumulation. We truncate all data to 56k length for ChatGLM
+with these two methods to ensure no GPU memory overflow.
+7
+Llama-2-13B-64k LongBench-Chat S-Doc QA M-Doc QA Summ MT-Bench
+Packing+loss weighting 6.79 68.0 40.3 43.6 6.12
+Sorted batching 7.02 66.1 43.9 45.3 6.02
+Table 4: Scaling up: LongAlign on LLama-2-13B.
+For instance, the model trained on ChatGLM3-6B
+using packing+loss weighting shows significantly
+better performance on LongBench-Chat, whereas
+sorted batching performs the best for Llama-2-7B.
+2. Loss weighting significantly improves performance on long instruction task for packing
+training. By comparing the performance of models with and without loss weighting strategy during
+packing training, it’s evident that incorporating the
+loss weighting strategy greatly improves the capability in LongBench-Chat (by about 5%∼10%),
+while having a minimal and variable impact on the
+performance of other tasks. We believe that this is
+primarily because, without loss weighting in SFT
+data, different long instruction data contribute variably to the loss — longer data tend to contribute
+more to the loss (refer to Eq. 3). Such an unnatural weighting bias is often detrimental to model
+training, potentially leading to training instability,
+deviating it from the optimal learning trajectory.
+4.4 Discussion
+Scalability of LongAlign. We explore two scaling
+directions on our LongAlign framework: larger
+model size and longer context window. To do so,
+we fine-tune Llama-2-13B-64k using LongAlign10k dataset with the two efficient training methods, and the evaluation results are shown in Table 4. Compared to the 7B-scale model, the 13B
+model shows a 10% improvement on LongBenchChat, setting a new record among open-sourced
+models (LongAlign-13B-64k in Figure 1). This
+indicates that our alignment method scales effectively to larger-scale models. We also construct
+SFT data up to 128k in length with human annotation and successfully align ChatGLM3-6B under
+128k context window using packing training with
+loss weighting, resulting in ChatGLM3-6B-128k
+(performance shown in Figure 1).
+Learning curve on long task v.s. short task. To
+compare the learning processes of alignment under
+long context and short context, we present in Figure 6 the relative performance curves on long and
+short instruction-following tasks (on LongBenchChat and MT-Bench, respectively) during model
+0 250 500 750 1000 1250 1500 1750
+Training steps
+0.2
+0.4
+0.6
+0.8
+1.0
+Score / Final score
+LongBench-Chat
+MT-Bench
+Figure 6: Relative performance on long and short tasks
+throughout the training process of ChatGLM3-6B-64k.
+training, illustrating how performance varies with
+the number of training steps. We use exponential moving average to smooth the original performance curves (dotted lines), and display them as
+solid lines. We observe that the trends of the two
+learning curves are strikingly similar — both show
+rapid improvement between 0-500 steps, followed
+by a slow rise, and stabilize after 1000 steps. This
+may imply a deeper connection between long and
+short alignment. They might be jointly determined
+by shared latent factors, which are optimized during training to help the model align to both long
+and short instructions simultaneously.
+In Appendix D, we provide case analyses
+of different LongAlign-tuned models on out-ofdistribution (OOD) long context query, that is,
+query that the models have not encountered in the
+long context SFT data. We find that models trained
+with LongAlign can generalize to OOD long context queries, such as writing a review for a research
+paper, and that larger-scale models have stronger
+generalization capabilities.
+5 Conclusion
+This paper aims to find the best practice for long
+context alignment in the scope of data, training
+method, and evaluation. Our proposed solution,
+namely LongAlign, uses Self-Instruct to construct
+diverse long instruction data, and efficiently finetune the model with packing combined with loss
+weighting or sorted batching. Moreover, we introduce LongBench-Chat to facilitate reliable as8
+sessment of LLM’s instruction-following ability
+on practical long context interactions. Through
+controlled experiments, we find that the amount,
+diversity of data, as well as the correct training
+method, are crucial to the final performance.

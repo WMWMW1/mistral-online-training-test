@@ -1,0 +1,2038 @@
+GradientBased Learning Applied to Document
+Recognition
+Yann LeCun Leon Bottou Yoshua Bengio and Patrick Haner
+Abstract
+Multilayer Neural Networks trained with the backpropa
+gation algorithm constitute the best example of a successful
+GradientBased Learning technique Given an appropriate
+network architecture GradientBased Learning algorithms
+can be used to synthesize a complex decision surface that can
+classify highdimensional patterns such as handwritten char
+acters with minimal preprocessing This paper reviews var
+ious methods applied to handwritten character recognition
+and compares them on a standard handwritten digit recog
+nition task Convolutional Neural Networks that are specif
+ically designed to deal with the variability of D shapes are
+shown to outperform all other techniques
+Reallife document recognition systems are composed
+of multiple modules including eld extraction segmenta
+tion recognition and language modeling A new learning
+paradigm called Graph Transformer Networks GTN al
+lows such multimodule systems to be trained globally using
+GradientBased methods so as to minimize an overall per
+formance measure
+Two systems for online handwriting recognition are de
+scribed Experiments demonstrate the advantage of global
+training and the 	exibility of Graph Transformer Networks
+A Graph Transformer Network for reading bank check is
+also described It uses Convolutional Neural Network char
+acter recognizers combined with global training techniques
+to provides record accuracy on business and personal checks
+It is deployed commercially and reads several million checks
+per day Keywords Neural Networks OCR Document Recogni
+tion Machine Learning GradientBased Learning Convo
+lutional Neural Networks Graph Transformer Networks Fi
+nite State Transducers
+Nomenclature
+ GT Graph transformer  GTN Graph transformer network  HMM Hidden Markov model  HOS Heuristic oversegmentation  KNN Knearest neighbor  NN Neural network  OCR Optical character recognition  PCA Principal component analysis  RBF Radial basis function  RSSVM Reducedset support vector method  SDNN Space displacement neural network  SVM Support vector method  TDNN Time delay neural network  VSVM Virtual support vector method
+The authors are with the Speech and Image Pro
+cessing Services Research Laboratory ATT Labs
+Research  Schulz Drive Red Bank NJ  Email	
+fyannleonbyoshuaha
+nergresearchattcom Yoshua Bengio
+is also with the Departement d
+Informatique et de Recherche
+Operationelle Universite de Montreal CP  Succ CentreVille
+ Chemin de la Tour Montreal Quebec Canada HC J
+I Introduction
+Over the last several years machine learning techniques
+particularly when applied to neural networks have played
+an increasingly important role in the design of pattern
+recognition systems In fact it could be argued that the
+availability of learning techniques has been a crucial fac
+tor in the recent success of pattern recognition applica
+tions such as continuous speech recognition and handwrit
+ing recognition
+The main message of this paper is that better pattern
+recognition systems can be built by relying more on auto
+matic learning and less on handdesigned heuristics This
+is made possible by recent progress in machine learning
+and computer technology Using character recognition as
+a case study we show that handcrafted feature extrac
+tion can be advantageously replaced by carefully designed
+learning machines that operate directly on pixel images
+Using document understanding as a case study we show
+that the traditional way of building recognition systems by
+manually integrating invidually designed modules can be
+replaced by a unied and wellprincipled design paradigm
+called Graph Transformer Networks that allows training
+all the modules to optimize a global performance criterion
+Since the early days of pattern recognition it has been
+known that the variability and richness of natural data
+be it speech glyphs or other types of patterns make it
+almost impossible to build an accurate recognition system
+entirely by hand Consequently most pattern recognition
+systems are built using a comnation of automatic learn
+ing techniques and handcrafted algorithms The usual
+method of recognizing individual patterns consists in divid
+ing the system into two main modules shown in gure 
+The rst module called the feature extractor transforms
+the input patterns so that they can be represented by low dimensional vectors or short strings of symbols that a can
+be easily matched or compared and b are relatively in variant with respect to transformations and distortions of
+the input patterns that do not change their nature The
+feature extractor contains most of the prior knowledge and
+is rather specic to the task It is also the focus of most of
+the design e	ort because it is often entirely handcrafted
+The classier on the other hand is often generalpurpose
+and trainable One of the main problems with this ap
+proach is that the recognition accuracy is largely deter
+mined by the ability of the designer to come up with an
+appropriate set of features This turns out to be a daunt
+ing task which unfortunately must be redone for each new
+problem A large amount of the pattern recognition liter
+ature is devoted to describing and compar
+PROC OF THE IEEE NOVEMBER  
+TRAINABLE CLASSIFIER MODULE
+FEATURE EXTRACTION MODULE
+Class scores
+Feature vector
+Raw input
+Fig  Traditional pattern recognition is performed with two mod
+ules	 a xed feature extractor and a trainable classier
+merits of di	erent feature sets for particular tasks
+Historically the need for appropriate feature extractors was due to the fact that the learning techniques used by
+the classiers were limited to lowdimensional spaces with
+easily separable classes 
+ A combination of three factors
+have changed this vision over the last decade First the
+availability of lowcost machines with fast arithmetic units
+allows to rely more on bruteforce numerical
+ methods
+than on algorithmic renements Second the availability
+of large databases for problems with a large market and
+wide interest such as handwriting recognition has enabled
+designers to rely more on real data and less on handcrafted
+feature extraction to build recognition systems The third
+and very important factor is the availability of powerful ma
+chine learning techniques that can handle highdimensional
+inputs and can generate intricate decision functions when
+fed with these large data sets It can be argued that the
+recent progress in the accuracy of speech and handwriting
+recognition systems can be attributed in large part to an
+increased reliance on learning techniques and large training
+data sets As evidence to this fact a large proportion of
+modern commercial OCR systems use some form of multi
+layer Neural Network trained with backpropagation
+In this study we consider the tasks of handwritten char
+acter recognition Sections I and II and compare the per
+formance of several learning techniques on a benchmark
+data set for handwritten digit recognition Section III
+While more automatic learning is benecial no learning
+technique can succeed without a minimal amount of prior
+knowledge about the task In the case of multilayer neu
+ral networks a good way to incorporate knowledge is to
+tailor its architecture to the task Convolutional Neu
+ral Networks 
+ introduced in Section II are an exam
+ple of specialized neural network architectures which in
+corporate knowledge about the invariances of D shapes
+by using local connection patterns and by imposing con
+straints on the weights A comparison of several methods
+for isolated handwritten digit recognition is presented in
+section III To go from the recognition of individual char
+acters to the recognition of words and sentences in docu
+ments the idea of combining multiple modules trained to
+reduce the overall error is introduced in Section IV Rec
+ognizing variablelength ob jects such as handwritten words
+using multimodule systems is best done if the modules
+manipulate directed graphs This leads to the concept of
+trainable Graph Transformer Network GTN also intro
+duced in Section IV Section V describes the now clas
+sical method of heuristic oversegmentation for recogniz
+ing words or other character strings Discriminative and
+nondiscriminative gradientbased techniques for training
+a recognizer at the word level without requiring manual
+segmentation and labeling are presented in Section VI Sec
+tion VII presents the promising SpaceDisplacement Neu
+ral Network approach that eliminates the need for seg
+mentation heuristics by scanning a recognizer at all pos
+sible locations on the input In section VIII it is shown
+that trainable Graph Transformer Networks can be for mulated as multiple generalized transductions based on a
+general graph composition algorithm The connections be
+tween GTNs and Hidden Markov Models commonly used
+in speech recognition is also treated Section IX describes
+a globally trained GTN system for recognizing handwrit
+ing entered in a pen computer This problem is known as
+online
+ handwriting recognition since the machine must
+produce immediate feedback as the user writes The core of
+the system is a Convolutional Neural Network The results
+clearly demonstrate the advantages of training a recognizer
+at the word level rather than training it on presegmented
+handlabeled isolated characters Section X describes a
+complete GTNbased system for reading handwritten and
+machineprinted bank checks The core of the system is the
+Convolutional Neural Network called LeNet described in
+Section II This system is in commercial use in the NCR
+Corporation line of check recognition systems for the bank
+ing indust It is reading millions of checks per month in
+several banks across the United States
+A Learning from Data
+There are several approaches to automatic machine
+learning but one of the most successful approaches pop
+ularized in recent years by the neural network community can be called numerical
+ or gradientbased learning The
+learning machine computes a function Y p  F Zp
+ W
+where Zp
+is the pth input pattern and W represents the
+collection of adjustable parameters in the system In a
+pattern recognition setting the output Y p may be inter
+preted as the recognized class label of pattern Zp
+ or as
+scores or probabilities associated with each class A loss
+function Ep  DDp
+ F W Zp
+ measures the discrep
+ancy between Dp
+ the correct
+ or desired output for pat
+tern Zp
+ and the output produced by the system The
+average loss function EtrainW is the average of the er
+rors Ep over a set of labeled examples called the training
+set fZ
+ D
+ ZP
+ DP
+g In the simplest setting the
+learning problem consists in nding the value of W that
+minimizes EtrainW In practice the performance of the
+system on a training set is of little interest The more rel
+evant measure is the error rate of the system in the eld
+where it would be used in practice This performance is
+estimated by measuring the accuracy on a set of samples
+disjoint from the training set called the test set Much
+theoretical and experimental work 
+ 
+ 
+ has shown
+PROC OF THE IEEE NOVEMBER  
+that the gap between the expected error rate on the test
+set Etest and the error rate on the training set Etrain de
+creases with the number of training samples approximately
+as
+Etest  Etrain  khP 
+
+where P is the number of training samples h is a measure of
+e	ective capacity
+ or complexity of the machine 
+ 
+ 
+is a number between  and  and k is a constant This
+gap always decreases when the number of training samples
+increases Furthermore as the capacity h increases Etrain
+decreases Therefore when increasing the capacity h there
+is a tradeo	 between the decrease of Etrain and the in
+crease of the gap with an optimal value of the capacity h
+that achieves the lowest generalization error Etest  Most
+learning algorithms attempt to minimize Etrain as well as
+some estimate of the gap A formal version of this is called
+structural risk minimization 
+ 
+ and is based on den
+ing a sequence of learning machines of increasing capacity corresponding to a sequence of subsets of the parameter
+space such that each subset is a superset of the previous
+subset In practical terms Structural Risk Minimization
+is implemented by minimizing Etrain  HW where the
+function HW is called a regularization function and  is
+a constant HW is chosen such that it takes large val
+ues on parameters W that belong to highcapacity subsets
+of the parameter space Minimizing HW in e	ect lim
+its the capacity of the accessible subset of the parameter
+space thereby controlling the tradeo	 between minimiz
+ing the training error and minimizing the expected gap
+between the training error and test error
+B GradientBased Learning
+The general problem of minimizing a function with re
+spect to a set of parameters is at the root of many issues in
+computer science GradientBased Learning draws on the
+fact that it is generally much easier to minimize a reason
+ably smooth continuous function than a discrete combi
+natorial function The loss function can be minimized by
+estimating the impact of small variations of the parame
+ter values on the loss function This is measured by the
+gradient of the loss function with respect to the param
+eters Ecient learning algorithms can be devised when
+the gradient vector can be computed analytically as op
+posed to numerically through perturbations This is the
+basis of numerous gradientbased learning algorithms with
+continuousvalued parameters In the procedures described
+in this article the set of parameters W is a realvalued vec
+tor with respect to which EW is continuous as well as
+di	erentiable almost everywhere The simplest minimiza
+tion procedure in such a setting is the gradient descent
+algorithm where W is iteratively adjusted as follows
+Wk  Wk   EW
+W  
+In the simplest case  is a scalar constant More sophisti
+cated procedures use variable  or substitute it for a diag
+onal matrix or substitute it for an estimate of the inverse
+Hessian matrix as in Newton or QuasiNewton methods
+The Conjugate Gradient method 
+ can also be used
+However Appendix B shows that despite many claims
+to the contrary in the literature the usefulness of these
+secondorder methods to large learning machines is very
+limited
+A popular minimization procedure is the stochastic gra
+dient algorithm also called the online update It consists
+in updating the parameter vector using a noisy or approx
+imated version of the average gradient In the most com
+mon instance of it W is updated on the basis of a single
+sample
+Wk  Wk   Epk W
+W 
+With this procedure the parameter vector uctuates
+around an average tra jectory but usually converges consid
+erably faster than regular gradient descent and second or
+der methods on large training sets with redundant samples
+such as those encountered in speech or character recogni
+tion The reasons for this are explained in Appendix B
+The properties of such algorithms applied to learning have
+been studied theoretically since the s 
+ 
+ 
+
+but practical successes for nontrivial tasks did not occur
+until the mid eighties
+C Gradient BackPropagation
+GradientBased Learning procedures have been used
+since the late s but they were mostly limited to lin
+ear systems 
+ The surprising usefulness of such sim
+ple gradient descent techniques for complex machine learn
+ing tasks was not widely realized until the following three
+events occurred The rst event was the realization that
+despite early warnings to the contrary 
+ the presence
+of local minima in the loss function does not seem to
+be a ma jor problem in practice This became apparent
+when it was noticed that local minima did not seem to
+be a ma jor impediment to the success of early nonlinear
+gradientbased Learning techniques such as Boltzmann ma
+chines 
+ 
+ The second event was the popularization
+by Rumelhart Hinton and Williams 
+ and others of a
+simple and ecient procedure the backpropagation al
+gorithm to compute the gradient in a nonlinear system
+composed of several layers of processing The third event was the demonstration that e backpropagation proce
+dure applied to multilayer neural networks with sigmoidal
+units can solve complicated learning tasks The basic idea
+of backpropagation is that gradients can be computed e
+ciently by propagation from the output to the input This
+idea was described in the control theory literature of the
+early sixties 
+ but its application to machine learning was not generally realized then Interestingly the early
+derivations of backpropagation in the context of neural
+network learning did not use gradients but virtual tar
+gets
+ for units in intermediate layers 
+ 
+ or minimal
+disturbance arguments 
+ The Lagrange formalism used
+in the control theory literature provides perhaps the best
+rigorous method for deriving backpropagation 
+ and for
+deriving generalizations of backpropagation to recurrent
+PROC OF THE IEEE NOVEMBER  	
+networks 
+ and networks of heterogeneous modules 
+
+A simple derivation for generic multilayer systems is given
+in Section IE
+The fact that local minima do not seem to be a problem
+for multilayer neural networks is somewhat of a theoretical mystery It is conjectured that if the network is oversized
+for the task as is usually the case in practice the presence
+of extra dimensions
+ in parameter space reduces the risk
+of unattainable regions Backpropagation is by far the
+most widely used neuralnetwork learning algorithm and
+probably the most widely used learning algorithm of any
+form
+D Learning in Real Handwriting Recognition Systems
+Isolated handwritten character recognition has been ex
+tensively studied in the literature see 
+ 
+ for reviews
+and was one of the early successful applications of neural
+networks 
+ Comparative experiments on recognition of
+individual handwritten digits are reported in Section III
+They show that neural networks trained with Gradient
+Based Learning perform better than all other methods
+tested here on the same data The best neural networks
+called Convolutional Networks are designed to learn to
+extract relevant features directly from pixel images see
+Section II
+One of the most dicult problems in handwriting recog
+nition however is not only to recognize individual charac
+ters but also to separate out characters from their neigh
+bors within the word or sentence a process known as seg
+mentation The technique for doing this that has become
+the standard
+ is called Heuristic OverSegmentation It
+consists in generating a large number of potential cuts
+between characters using heuristic image processing tech
+niques and subsequently selecting the best combination of
+cuts based on scores given for each candidate character by
+the recognizer In such a model the accuracy of the sys
+tem depends upon the quality of the cuts generated by the
+heuristics and on the ability of the recognizer to distin
+guish correctly segmented characters from pieces of char
+acters multiple characters or otherwise incorrectly seg
+mented characters Training a recognizer to perform this
+task poses a ma jor challenge because of the diculty in cre
+ating a labeled database of incorrectly segmented charac
+ters The simplest solution consists in running the images
+of character strings through the segmenter and then man
+ually labeling all the character hypotheses Unfortunately not only is this an extremely tedious and costly task it is
+also dicult to do the labeling consistently For example
+should the right half of a cut up  be labeled as a  or as
+a noncharacter should the right half of a cut up  be
+labeled as a 
+The rst solution described in Section V consists in
+training the system at the level of whole strings of char
+acters rather than at the character level The notion of
+GradientBased Learning can be used for this purpose The
+system is trained to minimize an overall loss function which
+measures the probability of an erroneous answer Section V
+explores various ways to ensure that the loss function is dif
+ferentiable and therefore lends itself to the use of Gradient
+Based Learning methods Section V introduces the use of
+directed acyclic graphs whose arcs carry numerical infor
+mation as a way to represent the alternative hypotheses
+and introduces the idea of GTN
+The second solution described in Section VII is to elim
+inate segmentation altogether The idea is to sweep the
+recognizer over every possible location on the input image
+and to rely on the character spotting
+ property of the rec
+ognizer ie its ability to correctly recognize a wellcentered
+character in its input eld even in the presence of other
+characters besides it while rejecting images containing no
+centered characters 
+ 
+ The sequence of recognizer
+outputs obtained by sweeping the recognizer over the in
+put is then fed to a Graph Transformer Network that takes
+linguistic constraints into account and nally extracts the
+most likely interpretation This GTN is somewhat similar
+to Hidden Markov Models HMM which makes the ap
+proach reminiscent of the classical speech recognition 
+
+
+ While this technique would be quite expensive in
+the general case the use of Convolutional Neural Networks
+makes it particularly attractive because it allows signicant
+savings in computational cost
+E Global ly Trainable Systems
+As stated earlier most practical pattern recognition sys
+tems are composed of multiple modules For example a
+document recognition system is composed of a eld locator
+which extracts regions of interest a eld segmenter which
+cuts the input image into images of candidate characters a
+recognizer which classies and scores each candidate char
+acter and a contextual postprocessor generally based on
+a stochastic grammar which selects the best grammatically
+correct answer from the hypotheses generated by the recog
+nizer In most cases the information carried from module
+to module is best represented as graphs with numerical in
+formation attached to the arcs For example the output
+of the recognizer module can be represented as an acyclic
+graph where each arc contains the label and the score of
+a candidate character and where each path represent a
+alternative interpretation of the input string Typically each module is manually optimized or sometimes trained
+outside of its context For example the character recog
+nizer would be trained on labeled images of presegmented
+characters Then the complete system is assembled and
+a subset of the parameters of the modules is manually ad
+justed to maximize the overall performance This last step
+is extremely tedious timeconsuming and almost certainly
+suboptimal
+A better alternative would be to somehow train the en
+tire system so as to minimize a global error measure such as
+the probability of character misclassications at the docu
+ment level Ideally we would want to nd a good minimum
+of this global loss function with respect to all the param
+eters in the system Ithe loss function E measuring the
+performance can be made di	erentiable with respect to the
+systems tunable parameters W we can nd a local min
+imum of E using GradientBased Learning However at
+PROC OF THE IEEE NOVEMBER  
+
+rst glance it appears that the sheer size and complexity
+of the system would make this intractable
+To ensure that the global loss function Ep
+Zp
+ W is dif
+ferentiable the overall system is built as a feedforward net work of di	erentiable modules The function implemented
+by each module must be continuous and di	erentiable al
+most everywhere with respect to the internal parameters of
+the module eg the weights of a Neural Net character rec
+ognizer in the case of a character recognition module and
+with respect to the modules inputs If this is the case a
+simple generalization of the wellknown backpropagation
+procedure can be used to eciently compute the gradients
+of the loss function with respect to all the parameters in
+the system 
+ For example let us consider a system
+built as a cascade of modules each of which implements a
+function Xn  FnWn Xn where Xn is a vector rep
+resenting the output of the module Wn is the vector of
+tunable parameters in the module a subset of W and
+Xn is the modules input vector as well as the previous
+modules output vector The input X to the rst module
+is the input pattern Zp
+ If the partial derivative of Ep with
+respect to Xn is known then the partial derivatives of Ep with respect to Wn and Xn can be computed using the
+backward recurrence
+Ep Wn 
+F
+W Wn Xn Ep Xn Ep Xn 
+F
+X Wn Xn Ep Xn
+
+where F
+W Wn Xn is the Jacobian of F with respect to
+W evaluated at the point Wn Xn and F
+X Wn Xn
+is the Jacobian of F with respect to X The Jacobian of
+a vector function is a matrix containing the partial deriva
+tives of all the outputs with respect to all the inputs
+The rst equation computes some terms of the gradient
+of Ep
+W while the second equation generates a back ward recurrence as in the wellknown backpropagation
+procedure for neural networks We can average the gradi
+ents over the training patterns to obtain the full gradient
+It is interesting to note that in many instances there is
+no need to explicitly compute the Jacobian matrix The
+above formula uses the product of the Jacobian with a vec
+tor of partial derivatives and it is often easier to compute
+this product directly without computing the Jacobian be
+forehand In By analogy with ordinary multilayer neural
+networks all but the last module are called hidden layers
+because their outputs are not observable from the outside
+more complex situations than the simple cascade of mod
+ules described above the partial derivative notation be
+comes somewhat ambiguous and awkward A completely
+rigorous derivation in more general cases can be done using
+Lagrange functions 
+ 
+ 
+
+Traditional multilayer neural networks are a special case
+of the above where the state information Xn is represented
+with xedsized vectors and where the modules are al
+ternated layers of matrix multiplications the weights and
+componentwise sigmoid functions the neurons However
+as stated earlier the state information in complex recogni
+tion system is best represented by graphs with numerical
+information attached to the arcs In this case each module
+called a Graph Transformer takes one or more graphs as
+input and produces a graph as output Networks of such
+modules are called Graph Transformer Networks GTN
+Sections IV VI and VIII develop the concept of GTNs
+and show that GradientBased Learning can be used to
+train all the parameters in all the modules so as to mini
+mize a global loss function It may seem paradoxical that
+gradients can be computed when the state information is
+represented by essentially discrete ob jects such as graphs
+but that diculty can be circumvented as shown later
+II Convolutional Neural Networks for
+Isolated Character Recognition
+The ability of multilayer networks trained with gradi
+ent descent to learn complex highdimensional nonlinear
+mappings from large collections of examples makes them
+obvious candidates for image recognition tasks In the tra
+ditional modelf pattern recognition a handdesigned fea
+ture extractor gathers relevant information from the input
+and eliminates irrelevant variabilities A trainable classier
+then categorizes the resulting feature vectors into classes
+In this scheme standard fullyconnected multilayer net works can be used as classiers A potentially more inter
+esting scheme is to rely on as much as possible on learning
+in the feature extractor itself In the case of character
+recognition a network could be fed with almost raw in
+puts eg sizenormalized images While this can be done
+with an ordinary fully connected feedforward network with
+some success for tasks such as character recognition there
+are problems
+Firstly typical images are large often with several hun
+dred variables pixels A fullyconnected rst layer with
+say one hundred hidden units in the rst layer would al
+ready contain several tens of thousands of weights Such
+a large number of parameters increases the capacity of the
+system and therefore requires a larger training set In ad
+dition the memory requirement to store so many weights
+may rule out certain hardware implementations But the
+main deciency of unstructured nets for image or speech
+applications is that they have no builtin invariance with
+respect to translations or local distortions of the inputs
+Before being sent to the xedsize input layer of a neural
+net character images or other D or D signals must be
+approximately sizenormalized and centered in the input
+eld Unfortunately no such preprocessing can be perfect
+handwriting is often normalized at the word level which
+can cause size slant and position variations for individual
+characters This combined with variability in writing style
+will cause variations in the position of distinctive features
+in input ob jects In principle a fullyconnected network of
+sucient size could learn to produce outputs that are in variant with respect to such variations However learning
+such a task would probably result in multiple units with
+similar weight patterns positioned at various locations in
+the input so as to detect distinctive features wherever they
+appear on the input Learning these weight congurations
+PROC OF THE IEEE NOVEMBER  
+requires a very large number of training instances to cover
+the space of possible variations In convolutional networks
+described below shift invariance is automatically obtained
+by forcing the replication of weight congurations across
+space
+Secondly a deciency of fullyconnected architectures is
+that the topology of the input is entirely ignored The in
+put variables can be presented in any xed order without
+a	ecting the outcome of the training On the contrary
+images or timefrequency representations of speech have
+a strong D local structure variables or pixels that are
+spatially or temporally nearby are highly correlated Local
+correlations are the reasons for the wellknown advantages
+of extracting and combining local features before recogniz
+ing spatial or temporal ob jects because congurations of
+neighboring variables can be classied into a small number
+of categories eg edges corners Convolutional Net
+works force the extraction of local features by restricting
+the receptive elds of hidden units to be local
+A Convolutional Networks
+Convolutional Networks combine three architectural
+ideas to ensure some degree of shift scale and distor
+tion invariance local receptive elds shared weights or weight replication and spatial or temporal subsampling A typical convolutional network for recognizing characters
+dubbed LeNet is shown in gure  The input plane
+receives images of characters that are approximately size
+normalized and centered Each unit in a layer receives in
+puts from a set of units located in a small neighborhood
+in the previous layer The idea of connecting units to local
+receptive elds on the input goes back to the Perceptron in
+the early s and was almost simultaneous with Hubel and
+Wiesels discovery of locallysensitive orientationselective
+neurons in the cats visual system 
+ Local connections
+have been used many times in neural models of visual learn
+ing 
+ 
+ 
+ 
+ 
+ 
+ With local receptive
+elds neurons can extract elementary visual features such
+as oriented edges endpoints corners or similar features in
+other signals such as speech spectrograms These features
+are then combined by the subsequent layers in order to de
+tect higherorder features As stated earlier distortions or
+shifts of the input can cause the position of salient features
+to vary In addition elementary feature detectors that are
+useful on one part of the image are likely to be useful across
+the entire image This knowledge can be applied by forcing
+a set of units whose receptive elds are located at di	erent
+places on the image to have identical weight vectors 
+
+
+ 
+ Units in a layer are organized in planes within
+which all the units share the same set of weights The set
+of outputs of the units in such a plane is called a feature
+map Units in a feature map are all constrained to per
+form the same operation on di	erent parts of the image
+A complete convolutional layer is composed of several fea
+ture maps with di	erent weight vectors so that multiple
+features can be extracted at each location A concrete ex
+ample of this is the rst layer of LeNet shown in Figure 
+Units in the rst hidden layer of LeNet are organized in 
+planes each of which is a feature map A unit in a feature
+map has  inputs connected to a  by  area in the input
+called the receptive eld of the unit Each unit has  in
+puts and therefore  trainable coecients plus a trainable
+bias The receptive elds of contiguous units in a feature
+map are centered on correspondingly contiguous units in
+the previous layer Therefore receptive elds of neighbor
+ing units overlap For example in the rst hidden layer
+of LeNet the receptive elds of horizontally contiguous
+units overlap by  columns and  rows As stated earlier
+all the units in a feature map share the same set of  weights and the same bias so they detect the same feature
+at all possible locations on the input The other feature
+maps in the layer use di	erent sets of weights and biases
+thereby extracting di	erent types of local features In the
+case of LeNet at each input location six di	erent types
+of features are extracted by six units in identical locations
+in the six feature maps A sequential implementation of
+a feature map would scan the input image with a single
+unit that has a local receptive eld and store the states
+of this unit at corresponding locations in the feature map
+This operation is equivalent to a convolution followed by
+an additive bias and squashing function hence the name
+convolutional network The kernel of the convolution is the
+set of connection weights used by the units in the feature
+map An interesting property of convolutional layers is that
+if the input image is shifted the feature map output will
+be shifted by the same amount but will be left unchanged
+otherwise This property is at the basis of the robustness
+of convolutional networks to shifts and distortions of the
+input
+Once a feature has been detected its exact location
+becomes less important Only its approximate position
+relative to other features is relevant For example once we know that the input image contains the endpoint of a
+roughly horizontal segment in the upper left area a corner
+in the upper right area and the endpoint of a roughly ver
+tical segment in the lower portion of the image we can tell
+the input image is a  Not only is the precise position of
+each of those features irrelevant for identifying the pattern
+it is potentially harmful because the positions are likely to vary for di	erent instances of the character A simple way
+to reduce the precision with which the position of distinc
+tive features are encoded in a feature map is to reduce the
+spatial resolution of the feature map This can be achieved
+with a socalled subsampling layers which performs a local
+averaging and a subsampling reducing the resolution of
+the feature map and reducing the sensitivity of the output
+to shifts and distortions The second hidden layer of LeNet
+ is a subsampling layer This layer comprises six feature
+maps one for each feature map in the previous layer The
+receptive eld of each unit is a  by  area in the previous
+layers corresponding feature map Each unit computes the
+average of its four inputs multiplies it by a trainable coef
+cient adds a trainable bias and passes the result through
+a sigmoid function Contiguous units have nonoverlapping
+contiguous receptive elds Consequently a subsampling
+layer feature map has half the number of rows and columns
+PROC OF THE IEEE NOVEMBER  
+
+INPUT
+32x32
+Convolutions Convolutions Subsampling
+C1: feature maps
+6@28x28
+Subsampling
+S2: f. maps
+6@14x14
+S4: f. maps 16@5x5
+C5: layer
+120
+C3: f. maps 16@10x10
+F6: layer
+ 84
+Full connection
+Full connection
+Gaussian connections
+OUTPUT
+ 10
+Fig  Architecture of LeNet a Convolutional Neural Network here for digits recognition Each plane is a feature map ie a set of units
+whose weights are constrained to be identical
+as the feature maps in the previous layer The trainable
+coecient and bias control the e	ect of the sigmoid non
+linearity If the coecient is small then the unit operates
+in a quasilinear mode and the subsampling layer merely
+blurs the input If the coecient is large subsampling
+units can be seen as performing a noisy OR
+ or a noisy
+AND
+ function depending on the value of the bias Succes
+sive layers of convolutions and subsampling are typically
+alternated resulting in a bipyramid
+ at each layer the number of feature maps is increased as the spatial resolu
+tion is decreased Each unit in the third hidden layer in g
+ure  may have input connections from several feature maps
+in the previous layer The convolutionsubsampling com
+bination inspired by Hubel and Wiesels notions of sim
+ple
+ and complex
+ cells was implemented in Fukushimas
+Neocognitron 
+ though no globally supervised learning
+procedure such as backpropagation was available then A
+large degree of invariance to geometric transformations of
+the input can be achieved with this progressive reduction
+of spatial resolution compensated by a progressive increase
+of the richness of the representation the number of feature
+maps
+Since all the weights are learned with backpropagation
+convolutional networks can be seen as synthesizing their
+own feature extractor The weight sharing technique has
+the interesting side e	ect of reducing the number of free
+parameters thereby reducing the capacity
+ of the ma
+chine and reducing the gap between test error and training
+error 
+ The network in gure  contains  con
+nections but only  trainable free parameters because
+of the weight sharing
+Fixedsize Convolutional Networks have been applied
+to many applications among other handwriting recogni
+tion 
+ 
+ machineprinted character recognition 
+
+online handwriting recognition 
+ and face recogni
+tion 
+ Fixedsize convolutional networks that share weights along a single temporal dimension are known as
+TimeDelay Neural Networks TDNNs TDNNs have been
+used in phoneme recognition without subsampling 
+
+
+ spoken word recognition with subsampling 
+
+
+ online recognition of isolated handwritten charac
+ters 
+ and signature verication 
+
+B LeNet
+This section describes in more detail the architecture of
+LeNet the Convolutional Neural Network used in the
+experiments LeNet comprises  layers not counting the
+input all of which contain trainable parameters weights
+The input is a x pixel image This is signicantly larger
+than the largest character in the database at most x
+pixels centered in a x eld The reason is that it is
+desirable that potential distinctive features such as stroke
+endpoints or corner can appear in the center of the recep
+tive eld of the highestlevel feature detectors In LeNet
+the set of centers of the receptive elds of the last convolu
+tional layer C see below form a x area in the center
+of the x input The values of the input pixels are nor
+malized so that the background level white corresponds
+to a value of  and the foreground black corresponds
+to  This makes the mean input roughly  and the variance roughly  which accelerates learning 
+
+In the following convolutional layers are labeled Cx sub
+sampling layers are labeled Sx and fullyconnected layers
+are labeled Fx where x is the layer index
+Layer C is a convolutional layer with  feature maps
+Each unit in each feature map is connected to a x neigh
+borhood in the input The size of the feature maps is x
+which prevents connection from the input from falling o	
+the boundary C contains  trainable parameters and
+ connections
+Layer S is a subsampling layer with  feature maps of
+size x Each unit in each feature map is connected to a
+x neighborhood in the corresponding feature map in C
+The four inputs to a unit in S are added then multiplied
+by a trainable coecient and added to a trainable bias
+The result is passed through a sigmoidal function The
+x receptive elds are nonoverlapping therefore feature
+maps in S have half the number of rows and column as
+feature maps in C Layer S has  trainable parameters
+and  connections
+Layer C is a convolutional layer with  feature maps
+Each unit in each feature map is connected to several x
+neighborhoods at identical locations in a subset of Ss
+feature maps Table I shows the set of S feature maps
+PROC OF THE IEEE NOVEMBER  
+               
+ X X X X X X X X X X
+ X X X X X X X X X X
+ X X X X X X X X X X
+ X X X X X X X X X X
+ X X X X X X X X X X
+ X X X X X X X X X X
+TABLE I
+Each column indicates which feature map in S are combined
+by the units in a particular feature map of C
+combined by each C feature map Why not connect ev
+ery S feature map to every C feature map The rea
+son is twofold First a noncomplete connection scheme
+keeps the number of connections within reasonable bounds
+More importantly it forces a break of symmetry in the net work Di	erent feature maps are forced to extract di	erent
+hopefully complementary features because they get dif
+ferent sets of inputs The rationale behind the connection
+scheme in table I is the following The rst six C feature
+maps take inputs from every contiguous subsets of three
+feature maps in S The next six take input from every
+contiguous subset of four The next three take input from
+some discontinuous subsets of four Finally the last one
+takes input from all S feature maps Layer C has 
+trainable parameters and  connections
+Layer S is a subsampling layer with  feature maps of
+size x Each unit in each feature map is connected to a
+x neighborhood in the corresponding feature map in C
+in a similar way as C and S Layer S has  trainable
+parameters and  connections
+Layer C is a convolutional layer with  feature maps
+Each unit is connected to a x neighborhood on all 
+of Ss feature maps Here because the size of S is also
+x the size of Cs feature maps is x this amounts
+to a full connection between S and C C is labeled
+as a convolutional layer instead of a fullyconnected layer
+because if LeNet input were made bigger with everything
+else kept constant the feature map dimension would be
+larger than x This process of dynamically increasing the
+size of a convolutional network is described in the section
+Section VII Layer C has  trainable connections
+Layer F contains  units the reason for this number
+comes from the design of the output layer explained be
+low and is fully connected to C It has  trainable
+parameters
+As in classical neural networks units in layers up to F
+compute a dot product between their input vector and their weight vector to which a bias is added This weighted sum
+denoted ai for unit i is then passed through a sigmoid
+squashing function to produce the state of unit i denoted
+by xi  xi  f ai 
+The squashing function is a scaled hyperbolic tangent
+f a  A tanhSa 
+where A is the amplitude of the function and S determines
+its slope at the origin The function f is odd with horizon
+tal asymptotes at A and A The constant A is chosen
+to be  The rationale for this choice of a squashing
+function is given in Appendix A
+Finally the output layer is composed of Euclidean Radial
+Basis Function units RBF one for each class with 
+inputs each The outputs of each RBF unit yi is computed
+as follows
+yi  X
+j
+xj  wij 
+ 
+In other words each output RBF unit computes the Eu
+clidean distance between its input vector and its parameter vector The further away is the input from the parameter vector the larger is the RBF output The output of a
+particular RBF can be interpreted as a penalty term mea
+suring the t between the input pattern and a model of the
+class associated with the RBF In probabilistic terms the
+RBF output can be interpreted as the unnormalized nega
+tive loglikelihood of a Gaussian distribution in the space
+of congurations of layer F Given an input pattern the
+loss function should be designed so as to get the congu
+ration of F as close as possible to the parameter vector
+of the RBF that corresponds to the patterns desired class
+The parameter vectors of these units were chosen by hand
+and kept xed at least initially The components of those
+parameters vectors were set to  or  While they could
+have been chosen at random with equal probabilities for 
+and  or even chosen to form an error correcting code
+as suggested by 
+ they were instead designed to repre
+sent a stylized image of the corresponding character class
+drawn on a x bitmap hence the number  Such a
+representation is not particularly useful for recognizing iso
+lated digits but it is quite useful for recognizing strings of
+characters taken from the full printable ASCII set The
+rationale is that characters that are similar and therefore
+confusable such as uppercase O lowercase O and zero or
+lowercase l digit  square brackets and uppercase I will
+have similar output codes This is particularly useful if the
+system is combined with a linguistic postprocessor that
+can correct such confusions Because the codes for confus
+able classes are similar the output of the corresponding
+RBFs for an ambiguous character will be similar and the
+postprocessor will be able to pick the appropriate interpre
+tation Figure  gives the output codes for the full ASCII
+set
+Another reason for using such distributed codes rather
+than the more common  of N
+ code also called place
+code or grandmother cell code for the outputs is that
+non distributed codes tend to behave badly when the num
+ber of classes is larger than a few dozens The reason is
+that output units in a nondistributed code must be o	
+most of the time This is quite dicult to achieve with
+sigmoid units Yet another reason is that the classiers are
+often used to not only recognize characters but also to re
+ject noncharacters RBFs with distributed codes are more
+appropriate for that purpose because unlike sigmoids they
+are activated within a well circumscribed region of their in
+PROC OF THE IEEE NOVEMBER  
+! " # $ % & ’ ( ) * + , − . /
+0 1 2 3 4 5 6 7 8 9 : ; < = > ?
+@ A B C D E F G H I J K L M N O
+P Q R S T U V W X Y Z [ \ ] ^ _
+‘ a b c d e f g h i j k l m n o
+p q r s t u v w x y z { | } ~ Fig  Initial parameters of the output RBFs for recognizing the
+full ASCII set
+put space that nontypical patterns are more likely to fall
+outside of
+The parameter vectors of the RBFs play the role of target vectors for layer F It is worth pointing out that the com
+ponents of those vectors are  or  which is well within
+the range of the sigmoid of F and therefore prevents those
+sigmoids from getting saturated In fact  and  are the
+points of maximum curvature of the sigmoids This forces
+the F units to operate in their maximally nonlinear range
+Saturation of the sigmoids must be avoided because it is
+known to lead to slow convergence and illconditioning of
+the loss function
+C Loss Function
+The simplest output loss function that can be used with
+the above network is the Maximum Likelihood Estimation
+criterion MLE which in our case is equivalent to the Min
+imum Mean Squared Error MSE The criterion for a set
+of training samples is simply
+EW  
+P X
+P
+p
+yDp Zp
+ W 
+where yDp is the output of the Dpth RBF unit ie the
+one that corresponds to the correct class of input pattern
+Zp
+ While this cost function is appropriate for most cases
+it lacks three important properties First if we allow the
+parameters of the RBF to adapt EW has a trivial but
+totally unacceptable solution In this solution all the RBF
+parameter vectors are equal and the state of F is constant
+and equal to that parameter vector In this case the net work happily ignores the input and all the RBF outputs
+are equal to zero This collapsing phenomenon does not
+occur if the RBF weights are not allowed to adapt The
+second problem is that there is no competition between
+the classes Such a competition can be obtained by us
+ing a more discriminative training criterion dubbed the
+MAP maximum a posteriori criterion similar to Maxi mum Mutual Information criterion sometimes used to train
+HMMs 
+ 
+ 
+ It corresponds to maximizing the
+posterior probability of the correct class Dp or minimiz
+ing the logarithm of the probability of the correct class
+given that the input image can come from one of the classes
+or from a background rubbish
+ class label In terms of
+penalties it means that in addition to pushing down the
+penalty of the correct class like the MSE criterion this
+criterion also pulls up the penalties of the incorrect classes
+EW  
+P X
+P
+p
+yDp Zp
+ W  logej X
+i
+eyiZp
+W
+
+The negative of the second term plays a competitive
+ role
+It is necessarily smaller than or equal to the rst term
+therefore this loss function is positive The constant j is
+positive and prevents the penalties of classes that are al
+ready very large from being pushed further up The pos
+terior probability of this rubbish class label would be the
+ratio of ej and ej  P
+i eyiZp
+W
+ This discrimina
+tive criterion prevents the previously mentioned collaps
+ing e	ect
+ when the RBF parameters are learned because
+it keeps the RBF centers apart from each other In Sec
+tion VI we present a generalization of this criterion for
+systems that learn to classify multiple ob jects in the input
+eg characters in words or in documents
+Computing the gradient of the loss function with respect
+to all the weights in all the layers of the convolutional
+network is done with backpropagation The standard al
+gorithm must be slightly modied to take account of the weight sharing An easy way to implement it is to rst com
+pute the partial derivatives of the loss function with respect
+to each connection as if the network were a conventional multilayer network without weight sharing Then the par
+tial derivatives of all the connections that share a same
+parameter are added to form the derivative with respect to
+that parameter
+Such a large architecture can be trained very eciently but doing so requires the use of a few techniques that are
+described in the appendix Section A of the appendix
+describes details such as the particular sigmoid used and
+the weight initialization Section B and C describe the
+minimization procedure used which is a stochastic version
+of a diagonal approximation to the LevenbergMarquardt
+procedure
+III Results and Comparison with Other
+Methods
+While recognizing individual digits is only one of many
+problems involved in designing a practical recognition sys
+tem it is an excellent benchmark for comparing shape
+recognition methods Though many existing method com
+bine a handcrafted feature extractor and a trainable clas
+sier this study concentrates on adaptive methods that
+operate directly on sizenormalized images
+A Database the Modied NIST set
+The database used to train and test the systems de
+scribed in this paper was constructed from the NISTs Spe
+cial Database  and Special Database  containing binary
+images of handwritten digits NIST originally designated
+SD as their training set and SD as their test set How ever SD is much cleaner and easier to recognize than SD
+ The reason for this can be found on the fact that SD
+PROC OF THE IEEE NOVEMBER   was collected among Census Bureau employees while SD was collected among highschool students Drawing sensi
+ble conclusions from learning experiments requires that the
+result be independent of the choice of training set and test
+among the complete set of samples Therefore it was nec
+essary to build a new database by mixing NISTs datasets
+SD contains  digit images written by  dif
+ferent writers In contrast to SD where blocks of data
+from each writer appeared in sequence the data in SD is
+scrambled Writer identities for SD are available and we
+used this information to unscramble the writers We then
+split SD in two characters written by the rst  writers went into our new training set The remaining  writers were placed in our test set Thus we had two sets with
+nearly  examples each The new training set was
+completed with enough examples from SD starting at
+pattern   to make a full set of  training patterns
+Similarly the new test set was completed with SD exam
+ples starting at pattern   to make a full set with
+ test patterns In the experiments described here we
+only used a subset of  test images  from SD
+and  from SD but we used the full  training
+samples The resulting database was called the Modied
+NIST or MNIST dataset
+The original black and white bilevel images were size
+normalized to t in a x pixel box while preserving
+their aspect ratio The resulting images contain grey lev
+els as result of the antialiasing image interpolation tech
+nique used by the normalization algorithm Three ver
+sions of the database were used In the rst version
+the images were centered in a x image by comput
+ing the center of mass of the pixels and translating the
+image so as to position this point at the center of the
+x eld In some instances this x eld was ex
+tended to x with background pixels This version of
+the database will be referred to as the regular database
+In the second version of the database the character im
+ages were deslanted and cropped down to x pixels im
+ages The deslanting computes the second moments of in
+ertia of the pixels counting a foreground pixel as  and a
+background pixel as  and shears the image by horizon
+tally shifting the lines so that the principal axis is verti
+cal This version of the database will be referred to as the
+deslanted database In the third version of the database
+used in some early experiments the images were reduced
+to x pixels The regular database  training
+examples  test examples sizenormalized to x
+and centered by center of mass in x elds is avail
+able at httpwwwresearchattcom yannocrmnist Figure  shows examples randomly picked from the test set
+B Results
+Several versions of LeNet were trained on the regular
+MNIST database  iterations through the entire train
+ing data were performed for each session The values of
+the global learning rate 	 see Equation  in Appendix C
+for a denition was decreased using the following sched
+ule  for the rst two passes  for the next
+Fig  Sizenormalized examples from the MNIST database
+three  for the next three  for the next 
+and  thereafter Before each iteration the diagonal
+Hessian approximation was reevaluated on  samples as
+described in Appendix C and kept xed during the entire
+iteration The parameter 
+ was set to  The resulting
+e	ective learning rates during the rst pass varied between
+approximately   
+ and  over the set of parame
+ters The test error rate stabilizes after around  passes
+through the training set at ! The error rate on the
+training set reaches ! after  passes Many authors
+have reported observing the common phenomenon of over
+training when training neural networks or other adaptive
+algorithms on various tasks When overtraining occurs
+the training error keeps decreasing over time but the test
+error goes through a minimum and starts increasing after
+a certain number of iterations While this phenomenon is very common it was not observed in our case as the learn
+ing curves in gure  show A possible reason is that the
+learning rate was kept relatively large The e	ect of this is
+that the weights never settle down in the local minimum
+but keep oscillating randomly Because of those uctua
+tions the average cost will be lowein a broader minimum
+Therefore stochastic gradient will have a similar e	ect as
+a regularization term that favors broader minima Broader
+minima correspond to solutions with large entropy of the
+parameter distribution which is benecial to the general
+ization error
+The inuence of the training set size was measured by
+training the network with   and  exam
+ples The resulting training error and test error are shown
+in gure  It is clear that even with specialized architec
+tures such as LeNet more training data would improve
+the accuracy To verify this hypothesis we articially generated more
+training examples by randomly distorting the original
+training images The increased training set was composed
+of the  original patterns plus  instances of
+PROC OF THE IEEE NOVEMBER  
+0 4 8 12 16 20
+4%
+2%
+0%
+Test
+Training
+Error Rate (%)
+1%
+3%
+5%
+Training set Iterations
+Fig  Training and test error of LeNet as a function of the num ber of passes through the  pattern training set without
+distortions The average training error is measured onthey as
+training proceeds This explains why the training error appears
+to be larger than the test error Convergence is attained after 
+to  passes through the training set
+0 0
+0.2
+0.4
+0.6
+0.8
+1
+1.2
+1.4
+1.6
+1.8
+Training error (no distortions)
+Test error (no distortions)
+Test error
+(with distortions)
+Training Set Size (x1000)
+10 20 30 40 50 60 70 80 90 100
+Error Rate (%)
+Fig  Training and test errors of LeNet achieved using training
+sets of various sizes This graph suggests that a larger training
+set could improve the performance of LeNet The hollow square
+show the test error when more training patterns are articially
+generated using random distortions The test patterns are not
+distorted
+distorted patterns with randomly picked distortion param
+eters The distortions were combinations of the follow
+ing planar ane transformations horizontal and verti
+cal translations scaling squeezing simultaneous horizon
+tal compression and vertical elongation or the reverse
+and horizontal shearing Figure  shows examples of dis
+torted patterns used for training When distorted data was
+used for training the test error rate dropped to ! from
+! without deformation The same training parame
+ters were used as without deformations The total length of
+the training session was left unchanged  passes of 
+patterns each It is interesting to note that the network
+e	ectively sees each individual sample only twice over the
+course of these  passes
+Figure  shows all  misclassied test examples some
+of those examples are genuinely ambiguous but several are
+Fig  Examples of distortions of ten training patterns
+4−>6 3−>5 8−>2 2−>1 5−>3 4−>8 2−>8 3−>5 6−>5 7−>3
+9−>4 8−>0 7−>8 5−>3 8−>7 0−>6 3−>7 2−>7 8−>3 9−>4
+8−>2 5−>3 4−>8 3−>9 6−>0 9−>8 4−>9 6−>1 9−>4 9−>1
+9−>4 2−>0 6−>1 3−>5 3−>2 9−>5 6−>0 6−>0 6−>0 6−>8
+4−>6 7−>3 9−>4 4−>6 2−>7 9−>7 4−>3 9−>4 9−>4 9−>4
+8−>7 4−>2 8−>4 3−>5 8−>4 6−>5 8−>5 3−>8 3−>8 9−>8
+1−>5 9−>8 6−>3 0−>2 6−>5 9−>5 0−>7 1−>6 4−>9 2−>1
+2−>8 8−>5 4−>9 7−>2 7−>2 6−>5 9−>7 6−>1 5−>6 5−>0
+4−>9 2−>8 Fig  The  test patterns misclassied by LeNet Below each
+image is displayed the correct answers left and the network an swer right These errors are mostly caused either by genuinely
+ambiguous patterns or by digits written in a style that are under
+represented in the training set
+perfectly identiable by humans although they are writ
+ten in an underrepresented style This shows that further
+improvements are to be expected with more training data
+C Comparison with Other Classiers
+For the sake of comparison a variety of other trainable
+classiers was trained and tested on the same database An
+early subset of these results was presented in 
+ The error
+rates on the test set for the various methods are shown in
+gure 
+C Linear Classier and Pairwise Linear Classier
+Possibly the simplest classier that one might consider is
+a linear classier Each input pixel value contributes to a weighted sum for each output unit The output unit with
+the highest sum including the contribution of a bias con
+PROC OF THE IEEE NOVEMBER  
+K−NN Euclidean
+[deslant] K−NN Euclidean
+40 PCA + quadratic
+1000 RBF + linear
+SVM poly 4
+RS−SVM poly 5
+28x28−300−10
+28x28−1000−10
+28x28−300−100−10
+28x28−500−150−10
+
+LeNet−4 / Local
+LeNet−4 / K−NN
+LeNet−5
+ −−−− 12.0 −−−−>
+ −−−− 8.4 −−−−>
+ −−−− 7.6 −−−−>
+5
+2.4
+3.3
+3.6
+1.1
+1.1
+1
+0.8
+4.7
+3.6
+1.6
+4.5
+3.8
+3.05
+2.5
+2.95
+2.45
+
+1.7
+1.1
+1.1
+1.1
+0.95
+0.8
+0.7
+0 0.5 1 1.5 2 2.5 3 3.5 4 4.5 5
+[dist] V−SVM poly 9
+[dist] 28x28−300−10
+[dist] 28x28−1000−10
+[dist] 28x28−300−100−10
+[dist] 28x28−500−150−10
+[16x16] LeNet−1
+[dist] LeNet−5
+[dist] Boosted LeNet−4
+LeNet−4
+[16x16] Tangent Distance
+[deslant] 20x20−300−10
+Linear
+[deslant] Linear
+Pairwise
+Fig  Error rate on the test set  for various classication methods deslant indicates that the classier was trained and tested on
+the deslanted version of the database dist indicates that the training set was augmented with articially distorted examples x
+indicates that the system used the x pixel images The uncertainty in the quoted error rates is about 
+stant indicates the class of the input character On the
+regular data the error rate is ! The network has 
+free parameters On the deslanted images the test error
+rate is ! The network has  free parameters The
+deciencies of the linear classier are well documented 
+
+and it is included here simply to form a basis of comparison
+for more sophisticated classiers Various combinations of
+sigmoid units linear units gradient descent learning and
+learning by directly solving linear systems gave similar re
+sults
+A simple improvement of the basic linear classier was
+tested 
+ The idea is to train each unit of a singlelayer
+network to separate each class from each other class In our
+case this layer comprises  units labeled  
+ Unit ij is trained to produce  on patterns
+of class i  on patterns of class j and is not trained on
+other patterns The nal score for class i is the sum of
+the outputs all the units labeled ix minus the sum of the
+output of all the units labeled yi for all x and y The
+error rate on the regular test set was !
+C Baseline Nearest Neighbor Classier
+Another simple classier is a Knearest neighbor classi
+er with a Euclidean distance measure between input im
+ages This classier has the advantage that no training
+time and no brain on the part of the designer are required
+However the memory requirement and recognition time are
+large the complete  twenty by twenty pixel training
+images about  Megabytes at one byte per pixel must be
+available at run time Much more compact representations
+could be devised with modest increase in error rate On the
+regular test set the error rate was ! On the deslanted
+data the error rate was ! with k   Naturally a
+realistic Euclidean distance nearestneighbor system would
+operate on feature vectors rather than directly on the pix
+els but since all of the other systems presented in this
+study operate directly on the pixels this result is useful for
+a baseline comparison
+C Principal Component Analysis PCA and Polynomial
+Classier
+Following 
+ 
+ a preprocessing stage was con
+structed which computes the pro jection of the input pat
+tern on the  principal components of the set of training vectors To compute the principal components the mean of
+each input component was rst computed and subtracted
+from the training vectors The covariance matrix of the re
+sulting vectors was then computed and diagonalized using
+Singular Value Decomposition The dimensional feature vector was used as the input of a second degree polynomial
+classier This classier can be seen as a linear classier
+with  inputs preceded by a module that computes all
+PROC OF THE IEEE NOVEMBER  
+products of pairs of input variables The error on the reg
+ular test set was !
+C Radial Basis Function Network
+Following 
+ an RBF network was constructed The
+rst layer was composed of  Gaussian RBF units with
+x inputs and the second layer was a simple  inputs
+  outputs linear classier The RBF units were divided
+into  groups of  Each group of units was trained
+on all the training examples of one of the  classes using
+the adaptive Kmeans algorithm The second layer weights were computed using a regularized pseudoinverse method
+The error rate on the regular test set was !
+C OneHidden Layer Fully Connected Multilayer Neural
+Network
+Another classier that we tested was a fully connected multilayer neural network with two layers of weights one
+hidden layer trained with the version of backpropagation
+described in Appendix C Error on the regular test set was
+! for a network with  hidden units and ! for a
+network with  hidden units Using articial distortions
+to generate more training data brought only marginal im
+provement ! for  hidden units and ! for 
+hidden units When deslanted images were used the test
+error jumped down to ! for a network with  hidden
+units
+It remains somewhat of a mystery that networks with
+such a large number of free parameters manage to achieve
+reasonably low testing errors We conjecture that the dy
+namics of gradient descent learning in multilayer nets has
+a selfregularization
+ e	ect Because the origin of weight
+space is a saddle point that is attractive in almost every
+direction the weights invariably shrink during the rst
+few epochs recent theoretical analysis seem to conrm
+this 
+ Small weights cause the sigmoids to operate
+in the quasilinear region making the network essentially
+equivalent to a lowcapacity singlelayer network As the
+learning proceeds the weights grow which progressively
+increases the e	ective capacity of the network This seems
+to be an almost perfect if fortuitous implementation of
+Vapniks Structural Risk Minimization
+ principle 
+ A
+better theoretical understanding of these phenomena and
+more empirical evidence are denitely needed
+C TwoHidden Layer Fully Connected Multilayer Neural
+Network
+To see the e	ect of the architecture several twohidden
+layer multilayer neural networks were trained Theoreti
+cal results have shown that any function can be approxi
+mated by a onehidden layer neural network 
+ However
+several authors have observed that twohidden layer archi
+tectures sometimes yield better performance in practical
+situations This phenomenon was also observed here The
+test error rate of a x network was !
+a much better result than the onehidden layer network
+obtained using marginally more weights and connections
+Increasing the network size to x yielded
+only marginally improved error rates ! Training
+with distorted patterns improved the performance some
+what ! error for the x network and
+! for the x network
+C A Small Convolutional Network LeNet
+Convolutional Networks are an attempt to solve the
+dilemma between small networks that cannot learn
+the training set and large networks that seem over
+parameterized LeNet was an early embodiment of the
+Convolutional Network architecture which is included here
+for comparison purposes The images were downsampled
+to x pixels and centered in the x input layer Al
+though about  multiplyadd steps are required to
+evaluate LeNet its convolutional nature keeps the num
+ber of free parameters to only about  The LeNet
+ architecture was developed using our own version of
+the USPS US Postal Service zip codes database and its
+size was tuned to match the available data 
+ LeNet
+achieved ! test error The fact that a network with such
+a small number of parameters can attain such a good error
+rate is an indication that the architecture is appropriate
+for the task
+C LeNet
+Experiments with LeNet made it clear that a larger
+convolutional network was needed to make optimal use of
+the large size of the training set LeNet and later LeNet
+ were designed to address this problem LeNet is very
+similar to LeNet except for the details of the architec
+ture It contains  rstlevel feature maps followed by
+ subsampling maps connected in pairs to each rstlayer
+feature maps then  feature maps followed by  sub
+sampling map followed by a fully connected layer with
+ units followed by the output layer  units LeNet
+contains about  connections and has about 
+free parameters Test error was ! In a series of ex
+periments we replaced the last layer of LeNet with a
+Euclidean Nearest Neighbor classier and with the local
+learning
+ method of Bottou and Vapnik 
+ in which a lo
+cal linear classier is retrained each time a new test pattern
+is shown Neither of those methods improved the raw error
+rate although they did improve the rejection performance
+C Boosted LeNet
+Following theoretical work by R Schapire 
+ Drucker
+et al 
+ developed the boosting
+ method for combining multiple classiers Three LeNets are combined the rst
+one is trained the usual way the second one is trained on
+patterns that are ltered by the rst net so that the second
+machine sees a mix of patterns ! of which the rst net
+got right and ! of which it got wrong Finally the
+third net is trained on new patterns on which the rst and
+the second nets disagree During testing the outputs of
+the three nets are simply added Because the error rate of
+LeNet is very low it was necessary to use the articially
+distorted images as with LeNet in order to get enough
+samples to train the second and third nets The test error
+PROC OF THE IEEE NOVEMBER  	
+rate was ! the best of any of our classiers At rst
+glance boosting appears to be three times more expensive
+as a single net In fact when the rst net produces a
+high condence answer the other nets are not called The
+average computational cost is about  times that of a
+single net
+C Tangent Distance Classier TDC
+The Tangent Distance classier TDC is a nearest
+neighbor method where the distance function is made in
+sensitive to small distortions and translations of the input
+image 
+ If we consider an image as a point in a high
+dimensional pixel space where the dimensionality equals
+the number of pixels then an evolving distortion of a char
+acter traces out a curve in pixel space Taken together
+all these distortions dene a lowdimensional manifold in
+pixel space For small distortions in the vicinity of the
+original image this manifold can be approximated by a
+plane known as the tangent plane An excellent measure
+of 
+closeness
+ for character images is the distance between
+their tangent planes where the set of distortions used to
+generate the planes includes translations scaling skewing
+squeezing rotation and line thickness variations A test
+error rate of ! was achieved using x pixel images
+Preltering techniques using simple Euclidean distance at multiple resolutions allowed to reduce the number of nec
+essary Tangent Distance calculations
+C Support Vector Machine SVM
+Polynomial classiers are wellstudied methods for gen
+erating complex decision surfaces Unfortunately they
+are impractical for highdimensional problems because the number of product terms is prohibitive The Support Vec
+tor technique is an extremely economical way of represent
+ing complex surfaces in highdimensional spaces including
+polynomials and many other types of surfaces 
+
+A particularly interesting subset of decision surfaces is
+the ones that correspond to hyperplanes that are at a max
+imum distance from the convex hulls of the two classes in
+the highdimensional space of the product terms Boser
+Guyon and Vapnik 
+ realized that any polynomial of
+degree k in this maximum margin
+ set can be computed
+by rst computing the dot product of the input image with
+a subset of the training samples called the support vec
+tors
+ elevating the result to the kth power and linearly
+combining the numbers thereby obtained Finding the sup
+port vectors and the coecients amounts to solving a high
+dimensional quadratic minimization problem with linear
+inequality constraints For the sake of comparison we in
+clude here the results obtained by Burges and Sch"olkopf
+reported in 
+ With a regular SVM their error rate
+on the regular test set was ! Cortes and Vapnik had
+reported an error rate of ! with SVM on the same
+data using a slightly di	erent technique The computa
+tional cost of this technique is very high about  million multiplyadds per recognition Using Sch"olkopf s Virtual
+Support Vectors technique VSVM ! error was at
+tained More recently Sch"olkopf personal communication
+8.1
+1.9
+1.8
+3.2
+3.7
+1.8
+1.4
+1.6
+0.5
+[deslant] K−NN Euclidean
+[16x16] Tangent Distance
+SVM poly 4
+LeNet−4
+LeNet−4 / Local
+LeNet−4 / K−NN
+[dist] Boosted LeNet−4
+0123456789
+[deslant] 20x20−300−10
+[16x16] LeNet−1
+Fig  Rejection Performance	 percentage of test patterns that must be rejected to achieve  error for some of the systems
+4
+36
+−−−− 24,000 −−−−>
+39
+794
+−−−− 20,000 −−−−>
+−−−− 14,000 −−−−>
+650
+−−−− 28,000 −−−−>
+123
+795
+267
+469
+100
+260
+−−−− 20,000 −−−−>
+−−−− 10,000 −−−−>
+401
+460
+[deslant] K−NN Euclidean
+1000 RBF
+[16x16] Tangent Distance
+SVM poly 4
+RS−SVM poly 5
+[dist] V−SVM poly 9
+[deslant] 20x20−300−10
+28x28−1000−10
+28x28−300−100−10
+28x28−500−150−10
+[16x16] LeNet−1
+LeNet−4
+LeNet−4 / Local
+LeNet−4 / K−NN
+LeNet−5
+Boosted LeNet−4
+0 300 600 900
+Linear
+Pairwise
+40 PCA+quadratic
+Fig  Number of multiplyaccumulate operations for the recogni
+tion of a single character starting with a sizenormalized image
+has reached ! using a modied version of the VSVM
+Unfortunately VSVM is extremely expensive about twice
+as much as regular SVM To alleviate this problem Burges
+has proposed the Reduced Set Support Vector technique
+RSSVM which attained ! on the regular test set 
+
+with a computational cost of only  multiplyadds
+per recognition ie only about ! more expensive than
+LeNet
+D Discussion
+A summary of the performance of the classiers is shown
+in Figures  to  Figure  shows the raw error rate of the
+classiers on the  example test set Boosted LeNet
+performed best achieving a score of ! closely followed
+by LeNet at !
+Figure  shows the number of patterns in the test set
+that must be rejected to attain a ! error for some of
+the methods Patterns are rejected when the value of cor
+responding output is smaller than a predened threshold
+In many applications rejection performance is more signif
+icant than raw error rate The score used to decide upon
+the rejection of a pattern was the di	erence between the
+scores of the top two classes Again Boosted LeNet has
+the best performance The enhanced versions of LeNet
+did better than the original LeNet even though the raw
+PROC OF THE IEEE NOVEMBER  
+
+4
+35
+−−− 24,000 −−−>
+40
+794
+−−− 25,000 −−−>
+−−−− 14,000 −−−−>
+650
+−−−− 28,000 −−−−>
+123
+795
+267
+469
+3
+17
+−−− 24,000 −−−>
+−−− 24,000 −−−>
+60
+51
+1000 RBF
+[16x16] Tangent Distance
+SVM poly 4
+RS−SVM poly 5
+[dist] V−SVM poly 5
+[deslant] 20x20−300−10
+28x28−1000−10
+28x28−300−100−10
+28x28−500−150−10
+[16x16] LeNet 1
+LeNet 4
+LeNet 4 / Local
+LeNet 4 / K−NN
+LeNet 5
+Boosted LeNet 4
+0 300 600 900
+Linear
+Pairwise
+40 PCA+quadratic
+[deslant] K−NN Euclidean
+Fig  Memory requirements measured in number of variables for each of the methods Most of the methods only require one byte
+per variable for adequate performance
+accuracies were identical
+Figure  shows the number of multiplyaccumulate op
+erations necessary for the recognition of a single size
+normalized image for each method Expectedly neural
+networks are much less demanding than memorybased
+methods Convolutional Neural Networks are particu
+larly well suited to hardware implementations because of
+their regular structure and their low memory requirements
+for the weights Single chip mixed analogdigital imple
+mentations of LeNets predecessors have been shown to
+operate at speeds in excess of  characters per sec
+ond 
+ However the rapid progress of mainstream com
+puter technology renders those exotic technologies quickly
+obsolete Coste	ective implementations of memorybased
+techniques are more elusive due to their enormous memory
+requirements and computational requirements
+Training time was also measured Knearest neighbors
+and TDC have essentially zero training time While the
+singlelayer net the pairwise net and PCAquadratic net
+could be trained in less than an hour the multilayer net
+training times were expectedly much longer but only re
+quired  to  passes through the training set This
+amounts to  to  days of CPU to train LeNet on a Sil
+icon Graphics Origin  server using a single MHz
+R processor It is important to note that while the
+training time is somewhat relevant to the designer it is of
+little interest to the nal user of the system Given the
+choice between an existing technique and a new technique
+that brings marginal accuracy improvements at the price
+of considerable training time any nal user would chose
+the latter
+Figure  shows the memory requirements and therefore
+the number of free parameters of the various classiers
+measured in terms of the number of variables that need
+to be stored Most methods require only about one byte
+per variable for adequate performance However Nearest
+Neighbor methods may get by with  bits per pixel for stor
+ing the template images Not surprisingly neural networks
+require much less memory than memorybased methods
+The Overall performance depends on many factors in
+cluding accuracy running time and memory requirements
+As computer technology improves largercapacity recog
+nizers become feasible Larger recognizers in turn require
+larger training sets LeNet was appropriate to the avail
+able technology in  just as LeNet is appropriate now In  a recognizer as complex as LeNet would have re
+quired several weeks training and more data than was
+available and was therefore not even considered For quite
+a long time LeNet was considered the state of the art
+The local learning classier the optimal margin classier
+and the tangent distance classier were developed to im
+prove upon LeNet # and they succeeded at that How ever they in turn motivated a search for improved neural
+network architectures This search was guided in part by
+estimates of the capacity of various learning machines de
+rived from measurements of the training and test error as
+a function of the number of training examples We dis
+covered that more capacity was needed Through a series
+of experiments in architecture combined with an analy
+sis of the characteristics of recognition errors LeNet and
+LeNet were crafted
+We nd that boosting gives a substantial improvement in
+accuracy with a relatively modest penalty in memory and
+computing expense Also distortion models can be used
+to increase the e	ective size of a data set without actually
+requiring to collect more data
+The Support Vector Machine has excellent accuracy which is most remarkable because unlike the other high
+performance classiers it does not include a priori knowl
+edge about the problem In fact this classier would do
+just as well if the image pixels were permuted with a xed
+mapping and lost their pictorial structure However reach
+ing levels of performance comparable to the Convolutional
+Neural Networks can only be done at considerable expense
+in memory and computational requirements The reduced
+set SVM requirements are within a factor of two of the
+Convolutional Networks and the error rate is very close
+Improvements of those results are expected as the tech
+nique is relatively new
+When plenty of data is available many methods can at
+tain respectable accuracy The neuralnet methods run much faster and require much less space than memory
+based techniques The neural nets advantage will become
+more striking as training databases continue to increase in
+size
+E Invariance and Noise Resistance
+Convolutional networks are particularly well suited for
+recognizing or rejecting shapes with widely varying size
+position and orientation such as the ones typically pro
+duced by heuristic segmenters in realworld string recogni
+tion systems
+In an experiment like the one described above the im
+portance of noise resistance and distortion invariance is
+not obvious The situation in most real applications is
+PROC OF THE IEEE NOVEMBER  
+quite di	erent Characters must generally be segmented
+out of their context prior to recognition Segmentation
+algorithms are rarely perfect and often leave extraneous
+marks in character images noise underlines neighboring
+characters or sometimes cut characters too much and pro
+duce incomplete characters Those images cannot be re
+liably sizenormalized and centered Normalizing incom
+plete characters can be very dangerous For example an
+enlarged stray mark can look like a genuine  Therefore
+many systems have resorted to normalizing the images at
+the level of elds or words In our case the upper and lower
+proles of entire elds amounts in a check are detected
+and used to normalize the image to a xed height While
+this guarantees that stray marks will not be blown up into
+characterlooking images this also creates wide variations
+of the size and vertical position of characters after segmen
+tation Therefore it is preferable to use a recognizer that is
+robust to such variations Figure  shows several exam
+ples of distorted characters that are correctly recognized by
+LeNet It is estimated that accurate recognition occurs
+for scale variations up to about a factor of  vertical shift variations of plus or minus about half the height of the
+character and rotations up to plus or minus  degrees
+While fully invariant recognition of complex shapes is still
+an elusive goal it seems that Convolutional Networks o	er
+a partial answer to the problem of invariance or robustness
+with respect to geometrical distortions
+Figure  includes examples of the robustness of LeNet
+ under extremely noisy conditions Processing those
+images would pose unsurmountable problems of segmen
+tation and feature extraction to many methods but
+LeNet seems able to robustly extract salient features
+from these cluttered images The training set used for
+the network shown here was the MNIST training set
+with salt and pepper noise added Each pixel was ran
+domly inverted with probability  More examples
+of LeNet in action are available on the Internet at
+httpwwwresearchattcomyannocr
+IV MultiModule Systems and Graph
+Transformer Networks
+The classical backpropagation algorithm as described
+and used in the previous sections is a simple form of
+GradientBased Learning However it is clear that the
+gradient backpropagation algorithm given by Equation 
+describes a more general situation than simple multilayer
+feedforward networks composed of alternated linear trans
+formations and sigmoidal functions In principle deriva
+tives can be backpropagated through any arrangement of
+functional modules as long as we can compute the prod
+uct of the Jacobians of those modules by any vector Why would we want to train systems composed of multiple het
+erogeneous modules The answer is that large and complex
+trainable systems need to be built out of simple specialized
+modules The simplest example is LeNet which mixes
+convolutional layers subsampling layers fullyconnected
+layers and RBF layers Another less trivial example de
+scribed in the next two sections is a system for recognizing
+F0(X0)
+E
+W1
+D
+X1
+F1(X0,X1,W1)
+F2(X2,W2)
+X2
+X3
+X4
+X5 F3(X3,X4)
+
+Function
+Z
+t Input
+Desired Output
+Loss
+W2
+Fig  A trainable system composed of heterogeneous modules
+words that can be trained to simultaneously segment and
+recognize words without ever being given the correct seg
+mentation
+Figure  shows an example of a trainable multimodular
+system A multimodule system is dened by the function
+implemented by each of the modules and by the graph of
+interconnection of the modules to each other The graph
+implicitly denes a partial order according to which the
+modules must be updated in the forward pass For exam
+ple in Figure  module  is rst updated then modules 
+and  are updated possibly in parallel and nally mod
+ule  Modules may or may not have trainable parameters
+Loss functions which measure the performance of the sys
+tem are implemented as module  In the simplest case
+the loss function module receives an external input that
+carries the desired output In this framework there is no
+qualitative di	erence between trainable parameters WW
+in the gure external inputs and outputs ZDE and
+intermediate state variablesXXX	X
+X
+A An ObjectOriented Approach
+Ob jectOriented programming o	ers a particularly con venient way of implementing multimodule systems Each
+module is an instance of a class Module classes have a for ward propagation
+ method or member function called
+fprop whose arguments are the inputs and outputs of the
+module For example computing the output of module 
+in Figure  can be done by calling the method fprop on
+module  with the arguments X	X
+X Complex mod
+ules can be constructed from simpler modules by simply
+dening a new class whose slots will contain the member
+modules and the intermediate state variables between those
+modules The fprop method for the class simply calls the
+fprop methods of the member modules with the appro
+priate intermediate state variables or external input and
+outputs as arguments Although the algorithms are eas
+ily generalizable to any network of such modules including
+those whose inuence graph has cycles we will limit the dis
+cussion to the case of directed acyclic graphs feedforward
+networks
+Computing derivatives in a multimodule system is just
+as simple A backward propagation
+ method called
+bprop for each module class can be dened for that pur
+pose The bprop method of a module takes the same ar
+PROC OF THE IEEE NOVEMBER  
+
+3
+4 4 4
+4
+4 3
+8
+3
+C1 S2 C3 S4 C5
+F6
+Output
+Fig  Examples of unusual distorted and noisy characters correctly recognized by LeNet The greylevel of the output label represents
+the penalty lighter for higher penalties
+guments as the fprop method All the derivatives in the
+system can be computed by calling the bprop method on all
+the modules in reverse order compared to the forward prop
+agation phase The state variables are assumed to contain
+slots for storing the gradients computed during the back ward pass in addition to storage for the states computed in
+the forward pass The backward pass e	ectively computes
+the partial derivatives of the loss E with respect to all the
+state variables and all the parameters in the system There
+is an interesting duality property between the forward and
+backward functions of certain modules For example a
+sum of several variables in the forward direction is trans
+formed into a simple fanout replication in the backward
+direction Conversely a fanout in the forward direction
+is transformed into a sum in the backward direction The
+software environment used to obtain the results described
+in this paper called SN uses the above concepts It is
+based on a homegrown ob jectoriented dialect of Lisp with
+a compiler to C
+The fact that derivatives can be computed by propaga
+tion in the reverse graph is easy to understand intuitively The best way to justify it theoretically is through the use of
+Lagrange functions 
+ 
+ The same formalism can be
+used to extend the procedures to networks with recurrent
+connections
+B Special Modules
+Neural networks and many other standard pattern recog
+nition techniques can be formulated in terms of multi
+modular systems trained with GradientBased Learning
+Commonly used modules include matrix multiplications
+and sigmoidal modules the combination of which can be
+used to build conventional neural networks Other mod
+ules include convolutional layers subsampling layers RBF
+layers and softmax
+ layers 
+ Loss functions are also
+represented as modules whose single output produces the value of the loss Commonly used modules have simple
+bprop methods In general the bprop method of a func
+tion F is a multiplication by the Jacobian of F  Here are
+a few commonly used examples The bprop method of a
+fanout a Y
+ connection is a sum and vice versa The
+bprop method of a multiplication by a coecient is a mul
+tiplication by the same coecient The bprop method of a multiplication by a matrix is a multiplication by the trans
+pose of that matrix The bprop method of an addition with
+a constant is the identity
+PROC OF THE IEEE NOVEMBER  
+Layer
+Layer
+(a)
+Graph
+Transformer
+Graph
+Transformer
+(b)
+Fig  Traditional neural networks and multimodule systems com municate xedsize vectors between layer MultiLayer Graph
+Transformer Networks are composed of trainable modules that
+operate on and produce graphs whose arcs carry numerical in
+formation
+Interestingly certain nondi	erentiable modules can be
+inserted in a multimodule system without adverse e	ect
+An interesting example of that is the multiplexer module
+It has two or more regular inputs one switching input
+and one output The module selects one of its inputs de
+pending upon the discrete value of the switching input
+and copies it on its output While this module is not dif
+ferentiable with respect to the switching input it is di	er
+entiable with respect to the regular inputs Therefore the
+overall function of a system that includes such modules will
+be di	erentiable with respect to its parameters as long as
+the switching input does not depend upon the parameters
+For example the switching input can be an external input
+Another interesting case is the min module This mod
+ule has two or more inputs and one output The output
+of the module is the minimum of the inputs The func
+tion of this module is di	erentiable everywhere except on
+the switching surface which is a set of measure zero In
+terestingly this function is continuous and reasonably reg
+ular and that is sucient to ensure the convergence of a
+GradientBased Learning algorithm
+The ob jectoriented implementation of the multimodule
+idea can easily be extended to include a bbprop method
+that propagates GaussNewton approximations of the sec
+ond derivatives This leads to a direct generalization for
+modular systems of the secondderivative backpropagation
+Equation  given in the Appendix
+The multiplexer module is a special case of a much
+more general situation described at length in Section VIII
+where the architecture of the system changes dynamically
+with the input data Multiplexer modules can be used to
+dynamically rewire or recongure the architecture of the
+system for each new input pattern
+C Graph Transformer Networks
+Multimodule systems are a very exible tool for build
+ing large trainable system However the descriptions in
+the previous sections implicitly assumed that the set of
+parameters and the state information communicated be
+tween the modules are all xedsize vectors The limited
+exibility of xedsize vectors for data representation is a
+serious deciency for many applications notably for tasks
+that deal with variable length inputs eg continuous speech
+recognition and handwritten word recognition or for tasks
+that require encoding relationships between ob jects or fea
+tures whose number and nature can vary invariant per
+ception scene analysis recognition of composite ob jects
+An important special case is the recognition of strings of
+characters or words
+More generally xedsize vectors lack exibility for tasks
+in which the state must encode probability distributions
+over sequences of vectors or symbols as is the case in lin
+guistic processing Such distributions over sequences are
+best represented by stochastic grammars or in the more
+general case directed graphs in which each arc contains a
+vector stochastic grammars are special cases in which the vector contains probabilities and symbolic information
+Each path in the graph represents a di	erent sequence of vectors Distributions over sequences can be represented
+by interpreting elements of the data associated with each
+arc as parameters of a probability distribution or simply
+as a penalty Distributions over sequences are particularly
+handy for modeling linguistic knowledge in speech or hand
+writing recognition systems each sequence ie each path
+in the graph represents an alternative interpretation of the
+input Successive processing modules progressively rene
+the interpretation For example a speech recognition sys
+tem might start with a single sequence of acoustic vectors
+transform it into a lattice of phonemes distribution over
+phoneme sequences then into a lattice of words distribu
+tion over word sequences and then into a single sequence
+of words representing the best interpretation
+In our work on building largescale handwriting recog
+nition systems we have found that these systems could much more easily and quickly be developed and designed
+by viewing the system as a networks of modules that take
+one or several graphs as input and produce graphs as out
+put Such modules are called Graph Transformers and the
+complete systems are called Graph Transformer Networks or GTN Modules in a GTN communicate their states and
+gradients in the form of directed graphs whose arcs carry numerical information scalars or vectors 
+
+From the statistical point of view the xedsize state vectors of conventional networks can be seen as represent
+ing the means of distributions in state space In variable
+size networks such as the SpaceDisplacement Neural Net works described in section VII the states are variable
+length sequences of xed size vectors They can be seen
+as representing the mean of a probability distribution over variablelength sequences of xedsize vectors In GTNs
+the states are represented as graphs which can be seen
+as representing mixtures of probability distributions over
+structured collections possibly sequences of vectors Fig
+ure 

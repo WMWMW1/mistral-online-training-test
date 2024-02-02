@@ -1,0 +1,2781 @@
+One of the main points of the next several sections is
+to show that GradientBased Learning procedures are not
+limited to networks of simple modules that communicate
+PROC OF THE IEEE NOVEMBER  
+through xedsize vectors but can be generalized to GTNs
+Gradient backpropagation through a Graph Transformer
+takes gradients with respect to the numerical informa
+tion in the output graph and computes gradients with re
+spect to the numerical information attached to the input
+graphs and with respect to the modules internal param
+eters GradientBased Learning can be applied as long as
+di	erentiable functions are used to produce the numerical
+data in the output graph from the numerical data in the
+input graph and the functions parameters
+The second point of the next several sections is to show
+that the functions implemented by many of the modules
+used in typical document processing systems and other
+image recognition systems though commonly thought to
+be combinatorial in nature are indeed di	erentiable with
+respect to their internal parameters as well as with respect
+to their inputs and are therefore usable as part of a globally
+trainable system
+In most of the following we will purposely avoid making
+references to probability theory All the quantities manip
+ulated are viewed as penalties or costs which if necessary
+can be transformed into probabilities by taking exponen
+tials and normalizing
+V Multiple Object Recognition Heuristic
+OverSegmentation
+One of the most dicult problems of handwriting recog
+nition is to recognize not just isolated characters but
+strings of characters such as zip codes check amounts
+or words Since most recognizers can only deal with one
+character at a time we must rst segment the string into
+individual character images However it is almost impos
+sible to devise image analysis techniques that will infallibly
+segment naturally written sequences of characters into well
+formed characters
+The recent history of automatic speech recognition 
+
+
+ is here to remind us that training a recognizer by opti
+mizing a global criterion at the word or sentence level is much preferable to merely training it on handsegmented
+phonemes or other units Several recent works have shown
+that the same is true for handwriting recognition 
+ op
+timizing a wordlevel criterion is preferable to solely train
+ing a recognizer on presegmented characters because the
+recognizer can learn not only to recognize individual char
+acters but also to reject missegmented characters thereby
+minimizing the overall word error
+This section and the next describe in detail a simple ex
+ample of GTN to address the problem of reading strings of
+characters such as words or check amounts The method
+avoids the expensive and unreliable task of handtruthing
+the result of the segmentation often required in more tra
+ditional systems trained on individually labeled character
+images
+A Segmentation Graph
+A now classical method for word segmentation and recog
+nition is called Heuristic OverSegmentation 
+ 
+ Its
+main advantages over other approaches to segmentation are
+Fig  Building a segmentation graph with Heuristic Over Segmentation
+that it avoids making hard decisions about the segmenta
+tion by taking a large number of di	erent segmentations
+into consideration The idea is to use heuristic image pro
+cessing techniques to nd candidate cuts of the word or
+string and then to use the recognizer to score the alter
+native segmentations thereby generated The process is
+depicted in Figure  First a number of candidate cuts
+are generated Good candidate locations for cuts can be
+found by locating minima in the vertical pro jection prole
+or minima of the distance between the upper and lower
+contours of the word Better segmentation heuristics are
+described in section X The cut generation heuristic is de
+signed so as to generate more cuts than necessary in the
+hope that the correct
+ set of cuts will be included Once
+the cuts have been generated alternative segmentations are
+best represented by a graph called the segmentation graph The segmentation graph is a Directed Acyclic Graph DAG
+with a start node and an end node Each internal node is
+associated with a candidate cut produced by the segmen
+tation algorithm Each arc between a source node and a
+destination node is associated with an image that contains
+all the ink between the cut associated with the source node
+and the cut associated with the destination node An arc
+is created between two nodes if the segmentor decided that
+the ink between the corresponding cuts could form a can
+didate character Typically each individual piece of ink would be associated with an arc Pairs of successive pieces
+of ink would also be included unless they are separated by
+a wide gap which is a clear indication that they belong
+to di	erent characters Each complete path through the
+graph contains each piece of ink once and only once Each
+path corresponds to a di	erent way of associating pieces of
+ink together so as to form characters
+B Recognition Transformer and Viterbi Transformer
+A simple GTN to recognize character strings is shown
+in Figure  It is composed of two graph transformers
+called the recognition transformer Trec and the Viterbi
+transformer Tvit  The goal of the recognition transformer
+is to generate a graph called the interpretation graph or
+recognition graph Gint  that contains all the possible inter
+pretations for all the possible segmentations of the input
+Each path in Gint represents one possible interpretation of
+one particular segmentation of the input The role of the
+Viterbi transformer is to extract the best interpretation
+from the interpretation graph
+The recognition transformer Trec takes the segmentation
+graph Gseg as input and applies the recognizer for single
+characters to the images associated with each of the arcs
+PROC OF THE IEEE NOVEMBER  
+NN NN NN NN NN NN
+3
+2
+3
+4
+1
+4
+2
+3
+4
+34
+1
+4
+3
+2
+4
+Interpretation
+ Graph
+Segmentation
+ Graph
+Σ
+Viterbi Penalty
+Viterbi
+Path
+Gseg
+T rec
+T
+G
+vit
+int
+Gvit
+Viterbi
+Transformer
+Recognition
+Transformer
+Fig  Recognizing a character string with a GTN For readability only the arcs with low penalties are shown
+in the segmentation graph The interpretation graph Gint
+has almost the same structure as the segmentation graph
+except that each arc is replaced by a set of arcs from and
+to the same node In this set of arcs there is one arc for
+each possible class for the image associated with the cor
+responding arc in Gseg  As shown in Figure  to each
+arc is attached a class label and the penalty that the im
+age belongs to this class as produced by the recognizer If
+the segmentor has computed penalties for the candidate
+segments these penalties are combined with the penalties
+computed by the character recognizer to obtain the penal
+ties on the arcs of the interpretation graph Although com
+bining penalties of di	erent nature seems highly heuristic
+the GTN training procedure will tune the penalties and
+take advantage of this combination anyway Each path in
+the interpretation graph corresponds to a possible inter
+pretation of the input word The penalty of a particular
+interpretation for a particular segmentation is given by the
+sum of the arc penalties along the corresponding path in
+the interpretation graph Computing the penalty of an in
+terpretation independently of the segmentation requires to
+combine the penalties of all the paths with that interpre
+tation An appropriate rule for combining the penalties of
+parallel paths is given in section VIC
+The Viterbi transformer produces a graph Gvit with a
+single path This path is the path of least cumulated
+penalty in the Interpretation graph The result of the
+recognition can be produced by reading o	 the labels of
+the arcs along the graph Gvit extracted by the Viterbi
+transformer The Viterbi transformer owes its name to the
+3 0.1
+0.5
+penalty given by
+the segmentor
+"0"
+"1"
+6.7
+10.3
+0.3
+12.5
+"0"
+"1"
+"2"
+"3"
+7.9
+11.2
+6.8
+0.2
+13.5
+8.4
+W
+character recognizer
+penalty for each class
+class
+label
+ PIECE OF THE
+SEGMENTATION
+ GRAPH
+candidate
+ segment
+ image
+ PIECE OF THE
+INTERPRETATION
+ GRAPH
+ Character
+Recognizer Character
+Recognizer
+"8"
+"9"
+"8"
+"9"
+8
+Fig  The recognition transformer renes each arc of the segmen
+tation arc into a set of arcs in the interpretation graph one per character class with attached penalties and labels
+famous Viterbi algorithm 
+ an application of the prin
+ciple of dynamic programming to nd the shortest path
+in a graph eciently Let ci be the penalty associated to
+arc i with source node si  and destination node di note
+that there can be multiple arcs between two nodes In
+the interpretation graph arcs also have a label li  The
+Viterbi algorithm proceeds as follows Each node n is as
+sociated with a cumulated Viterbi penalty vn Those cu mulated penalties are computed in any order that satises
+the partial order dened by the interpretation graph which
+is directed and acyclic The start node is initialized with
+the cumulated penalty vstart   The other nodes cu mulated penalties vn are computed recursively from the v values of their parent nodes through the upstream arcs
+Un  farc i with destination di  ng
+vn  min
+iUn
+ci  vsi  
+Furthermore the value of i for each node n which minimizes
+the right hand side is noted mn the minimizing entering
+arc When the end node is reached we obtain in vend the
+total penalty of the path with the smallest total penalty We call this penalty the Viterbi penalty and this sequence
+of arcs and nodes the Viterbi path To obtain the Viterbi
+path with nodes n nT and arcs i iT  we trace back
+these nodes and arcs as follows starting with nT  the end
+node and recursively using the minimizing entering arc
+it  mnt  and nt  sit until the start node is reached
+The label sequence can then be read o	 the arcs of the
+Viterbi pat
+PROC OF THE IEEE NOVEMBER  
+VI Global Training for Graph Transformer
+Networks
+The previous section describes the process of recognizing
+a string using Heuristic OverSegmentation assuming that
+the recognizer is trained so as to give low penalties for the
+correct class label of correctly segmented characters high
+penalties for erroneous categories of correctly segmented
+characters and high penalties for all categories for badly
+formed characters This section explains how to train the
+system at the string level to do the above without requiring
+manual labeling of character segments This training will
+be performed with a GTN whose architecture is slightly
+di	erent from the recognition architecture described in the
+previous section
+In many applications there is enough a priori knowl
+edge about what is expected from each of the modules in
+order to train them separately For example with Heuris
+tic OverSegmentation one could individually label single
+character images and train a character recognizer on them
+but it might be dicult to obtain an appropriate set of
+noncharacter images to train the model to reject wrongly
+segmented candidates Although separate training is sim
+ple it requires additional supervision information that is
+often lacking or incomplete the correct segmentation and
+the labels of incorrect candidate segments Furthermore
+it can be shown that separate training is suboptimal 
+
+The following section describes three di	erent gradient
+based methods for training GTNbased handwriting recog
+nizers at the string level Viterbi training discriminative
+Viterbi training forward training and discriminative for ward training The last one is a generalization to graph
+based systems of the MAP criterion introduced in Sec
+tion IIC Discriminative forward training is somewhat
+similar to the socalled Maximum Mutual Information cri
+terion used to train HMM in speech recognition However
+our rationale di	ers from the classical one We make no
+recourse to a probabilistic interpretation but show that
+within the GradientBased Learning approach discrimina
+tive training is a simple instance of the pervasive principle
+of error correcting learning
+Training methods for graphbased sequence recognition
+systems such as HMMs have been extensively studied in
+the context of speech recognition 
+ Those methods re
+quire that the system be based on probabilistic generative
+models of the data which provide normalized likelihoods
+over the space of possible input sequences Popular HMM
+learning methods such as the the BaumWelsh algorithm
+rely on this normalization The normalization cannot be
+preserved when nongenerative models such as neural net works are integrated into the system Other techniques
+such as discriminative training methods must be used in
+this case Several authors have proposed such methods to
+train neural networkHMM speech recognizers at the word
+or sentence level 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+ 
+
+Other globally trainable sequence recognition systems
+avoid the diculties of statistical modeling by not resorting
+to graphbased techniques The best example is Recurrent
+Recognition
+Transformer
+Interpretation Graph
+Desired Sequence Path Selector
+Best Constrained Path
+Σ
+Constrained Viterbi Penalty
+Constrained
+Interpretation Graph Gc
+Gcvit
+Ccvit
+Gint
+Viterbi Transformer
+Fig  Viterbi Training GTN Architecture for a character string
+recognizer based on Heuristic OverSegmentation
+Neural Networks RNN Unfortunately despite early en
+thusiasm the training of RNNs with gradientbased tech
+niques has proved very dicult in practice 
+
+The GTN techniques presented below simplify and gen
+eralize the global training methods developed for speech
+recognition
+A Viterbi Training
+During recognition we select the path in the Interpre
+tation Graph that has the lowest penalty with the Viterbi
+algorithm Ideally we would like this path of lowest penalty
+to be associated with the correct label sequence as often as
+possible An obvious loss function to minimize is therefore
+the average over the training set of the penalty of the path
+associated with the correct label sequence that has the low est penalty The goal of training will be to nd the set of
+recognizer parameters the weights if the recognizer is a
+neural network that minimize the average penalty of this
+correct
+ lowest penalty path The gradient of this loss
+function can be computed by backpropagation through
+the GTN architecture shown in gure  This training
+architecture is almost identical to the recognition archi
+tecture described in the previous section except that an
+extra graph transformer called a path selector is inserted
+between the Interpretation Graph and the Viterbi Trans
+former This transformer takes the interpretation graph
+and the desired label sequence as input It extracts from
+the interpretation graph those paths that contain the cor
+rect dired label sequence Its output graph Gc is called
+the constrained interpretation graph also known as forced
+alignment in the HMM literature and contains all the
+paths that correspond to the correct label sequence The
+constrained interpretation graph is then sent to the Viterbi
+transformer which produces a graph Gcvit with a single
+path This path is the correct
+ path with the lowest
+penalty Finally a path scorer transformer takes Gcvit and
+simply computes its cumulated penalty Ccvit by adding up
+the penalties along the path The output of this GTN is
+PROC OF THE IEEE NOVEMBER  
+the loss function for the current pattern
+Evit  Ccvit 
+The only label information that is required by the above
+system is the sequence of desired character labels No
+knowledge of the correct segmentation is required on the
+part of the supervisor since it chooses among the segmen
+tations in the interpretation graph the one that yields the
+lowest penalty The process of backpropagating gradients through the
+Viterbi training GTN is now described As explained in
+section IV the gradients must be propagated backwards
+through all modules of the GTN in order to compute gra
+dients in preceding modules and thereafter tune their pa
+rameters Backpropagating gradients through the path
+scorer is quite straightforward The partial derivatives of
+the loss function with respect to the individual penalties on
+the constrained Viterbi path Gcvit are equal to  since the
+loss function is simply the sum of those penalties Back
+propagating through the Viterbi Transformer is equally
+simple The partial derivatives of Evit with respect to the
+penalties on the arcs of the constrained graph Gc are 
+for those arcs that appear in the constrained Viterbi path
+Gcvit and  for those that do not Why is it legitimate
+to backpropagate through an essentially discrete function
+such as the Viterbi Transformer The answer is that the
+Viterbi Transformer is nothing more than a collection of
+min functions and adders put together It was shown in
+Section IV that gradients can be backpropagated through
+min functions without adverse e	ects Backpropagation
+through the path selector transformer is similar to back
+propagation through the Viterbi transformer Arcs in Gint that appear in Gc have the same gradient as the corre
+sponding arc in Gc ie  or  depending on whether the
+arc appear in Gcvit The other arcs ie those that do
+not have an alter ego in Gc because they do not contain
+the right label have a gradient of  During the forward
+propagation through the recognition transformer one in
+stance of the recognizer for single character was created
+for each arc in the segmentation graph The state of rec
+ognizer instances was stored Since each arc penalty in
+Gint is produced by an individual output of a recognizer
+instance we now have a gradient  or  for each out
+put of each instance of the recognizer Recognizer outputs
+that have a non zero gradient are part of the correct an
+swer and will therefore have their value pushed down The
+gradients present on the recognizer outputs can be back
+propagated through each recognizer instance For each rec
+ognizer instance we obtain a vector of partial derivatives
+of the loss function with respect to the recognizer instance
+parameters All the recognizer instances share the same pa
+rameter vector since they are merely clones of each other
+therefore the full gradient of the loss function with respect
+to the recognizers parameter vector is simply the sum of
+the gradient vectors produced by each recognizer instance
+Viterbi training though formulated di	erently is often use
+in HMMbased speech recognition systems 
+ Similar al
+gorithms have been applied to speech recognition systems
+that integrate neural networks with time alignment 
+
+
+ 
+ or hybrid neuralnetworkHMM systems 
+ 
+
+
+
+While it seems simple and satisfying this training ar
+chitecture has a aw that can potentially be fatal The
+problem was already mentioned in Section IIC If the
+recognizer is a simple neural network with sigmoid out
+put units the minimum of the loss function is attained
+not when the recognizer always gives the right answer but
+when it ignores the input and sets its output to a constant vector with small values for all the components This is
+known as the col lapse problem The collapse only occurs if
+the recognizer outputs can simultaneously take their min
+imum value If on the other hand the recognizers out
+put layer contains RBF units with xed parameters then
+there is no such trivial solution This is due to the fact
+that a set of RBF with xed distinct parameter vectors
+cannot simultaneously take their minimum value In this
+case the complete collapse described above does not occur
+However this does not totally prevent the occurrence of a
+milder collapse because the loss function still has a at
+spot
+ for a trivial solution with constant recognizer out
+put This at spot is a saddle point but it is attractive in
+almost all directions and is very dicult to get out of using
+gradientbased minimization procedures If the parameters
+of the RBFs are allowed to adapt then the collapse prob
+lems reappears because the RBF centers can all converge
+to a single vector and the underlying neural network can
+learn to produce that vector and ignore the input A dif
+ferent kind of collapse occurs if the width of the RBFs are
+also allowed to adapt The collapse only occurs if a train
+able module such as a neural network feeds the RBFs The
+collapse does not occur in HMMbased speech recognition
+systems because they are generative systems that produce
+normalized likelihoods for the input data more on this
+later Another way to avoid the collapse is to train the
+whole system with respect to a discriminative training cri
+terion such as maximizing the conditional probability of
+the correct interpretations correct sequence of class labels
+given the input image
+Another problem with Viterbi training is that the
+penalty of the answer cannot be used reliably as a mea
+sure of condence because it does not take lowpenalty or
+highscoring competing answers into account
+B Discriminative Viterbi Training
+A modication of the training criterion can circumvent
+the collapse problem described above and at the same time
+produce more reliable condence values The idea is to not
+only minimize the cumulated penalty of the lowest penalty
+path with the correct interpretation but also to somehow
+increase the penalty of competing and possibly incorrect
+paths that have a dangously low penalty This type of
+criterion is called discriminative because it plays the good
+answers against the bad ones Discriminative training pro
+cedures can be seen as attempting to build appropriate
+separating surfaces between classes rather than to model
+individual classes independently of each other For exam
+PROC OF THE IEEE NOVEMBER  
+Path Selector
+Viterbi Tansformer
+Gcvit
+Gvit
+Viterbi Transformer
+Σ
+Segmentation
+ Graph
+Gseg
+Recognition
+Transfomer
+T rec
+Interpretation
+ Graph
+Gint
++
++
+[0.6](−1) [0.7](+1)
+1 [0.1](−1)
+4 [2.4](0) 4 [0.4](−1)
+2 [1.3](0) 3 [0.1](0)
+5 [2.3](0)
+3 [3.4](0)
+4 [4.4](0) 4 [0.6](+1)
+9 [1.2](0)
+[0.1](+1)
++ −
+"34"
+Desired
+Answer
+W
+Neural Net
+Weights
+NN NN NN NN NN
+4 4 1
+(−1) (+1) (−1)
+4 [0.6](+1)
+3 [0.1](+1)
+3 [0.1](−1) 4 [0.4](−1) 1 [0.1](−1)
+Gc
+3 [3.4](0) 4 [0.6](+1)
+4 [2.4](0) 3 [0.1](+1)
+Loss Function
+Segmenter
+Fig  Discriminative Viterbi Training GTN Architecture for a character string recognizer based on Heuristic OverSegmentation Quantities
+in square brackets are penalties computed during the forward propagation Quantities in parentheses are partial derivatives computed
+during the backward propagation
+PROC OF THE IEEE NOVEMBER  	
+ple modeling the conditional distribution of the classes
+given the input image is more discriminative focussing
+more on the classication surface than having a separate
+generative model of the input data associated to each class
+which with class priors yields the whole joint distribu
+tion of classes and inputs This is because the conditional
+approach does not need to assume a particular form for the
+distribution of the input data
+One example of discriminative criterion is the di	erence
+between the penalty of the Viterbi path in the constrained
+graph and the penalty of the Viterbi path in the uncon
+strained interpretation graph ie the di	erence between
+the penalty of the best correct path and the penalty of
+the best path correct or incorrect The corresponding
+GTN training architecture is shown in gure  The left
+side of the diagram is identical to the GTN used for non
+discriminative Viterbi training This loss function reduces
+the risk of collapse because it forces the recognizer to in
+creases the penalty of wrongly recognized ob jects Dis
+criminative training can also be seen as another example
+of error correction procedure which tends to minimize the
+di	erence between the desired output computed in the left
+half of the GTN in gure  and the actual output com
+puted in the right half of gure 
+Let the discriminative Viterbi loss function be denoted
+Edvit and let us call Ccvit the penalty of the Viterbi path in
+the constrained graph and Cvit the penalty of the Viterbi
+path in the unconstrained interpretation graph
+Edvit  Ccvit  Cvit 
+Edvit is always positive since the constrained graph is a
+subset of the paths in the interpretation graph and the
+Viterbi algorithm selects the path with the lowest total
+penalty In the ideal case the two paths Ccvit and Cvit
+coincide and Edvit is zero
+Backpropagating gradients through the discriminative
+Viterbi GTN adds some negative
+ training to the pre
+viously described nondiscriminative training Figure 
+shows how the gradients are backpropagated The left
+half is identical to the nondiscriminative Viterbi training
+GTN therefore the backpropagation is identical The gra
+dients backpropagated through the right half of the GTN
+are multiplied by  since Cvit contributes to the loss with
+a negative sign Otherwise the process is similar to the left
+half The gradients on arcs of Gint get positive contribu
+tions from the left half and negative contributions from the
+right half The two contributions must be added since the
+penalties on Gint arcs are sent to the two halves through
+a Y
+ connection in the forward pass Arcs in Gint that
+appear neither in Gvit nor in Gcvit have a gradient of zero
+They do not contribute to the cost Arcs that appear in
+both Gvit and Gcvit also have zero gradient The  contri
+bution from the right half cancels the the  contribution
+from the left half In other words when an arc is rightfully
+part of the answer there is no gradient If an arc appears
+in Gcvit but not in Gvit the gradient is  The arc should
+have had a lower penalty to make it to Gvit If an arc is
+in Gvit but not in Gcvit the gradient is  The arc had a
+low penalty but should have had a higher penalty since it
+is not part of the desired answer
+Variations of this technique have been used for the speech
+recognition Driancourt and Bottou 
+ used a version of
+it where the loss function is saturated to a xed value
+This can be seen as a generalization of the Learning Vector
+Quantization  LVQ loss function 
+ Other variations
+of this method use not only the Viterbi path but the K
+best paths The Discriminative Viterbi algorithm does not
+have the aws of the nondiscriminative version but there
+are problems nonetheless The main problem is that the
+criterion does not build a margin between the classes The
+gradient is zero as soon as the penalty of the constrained
+Viterbi path is equal to that of the Viterbi path It would
+be desirable to push up the penalties of the wrong paths
+when they are dangerously close to the good one The
+following section presents a solution to this problem
+C Forward Scoring and Forward Training
+While the penalty of the Viterbi path is perfectly appro
+priate for the purpose of recognition it gives only a partial
+picture of the situation Imagine the lowest penalty paths
+corresponding to several dierent segmentations produced
+the same answer the same label sequence Then it could
+be argued that the overall penalty for the interpretation
+should be smaller than the penalty obtained when only one
+path produced that interpretation because multiple paths
+with identical label sequences are more evidence that the
+label sequence is correct Several rules can be used com
+pute the penalty associated to a graph that contains several
+parallel paths We use a combination rule borrowed from
+a probabilistic interpretation of the penalties as negative
+log poeriors In a probabilistic framework the posterior
+probability for the interpretation should be the sum of the
+posteriors for all the paths that produce that interpreta
+tion Translated in terms of penalties the penalty of an
+interpretation should be the negative logarithm of the sum
+of the negative exponentials of the penalties of the individ
+ual pathThe overall penalty will be smaller than all the
+penalties of the individual paths
+Given an interpretation there is a well known method
+called the forward algorithm for computing the above quan
+tity eciently 
+ The penalty computed with this pro
+cedure for a particular interpretation is called the forward
+penalty Consider again the concept of constrained graph
+the subgraph of the interpretation graph which contains
+only the paths that are consistent with a particular label
+sequence There is one constrained graph for each pos
+sible label sequence some may be empty graphs which
+have innite penalties Given an interpretation running
+the forward algorithm on the corresponding constrained
+graph gives the forward penalty for that interpretation
+The forward algorithm proceeds in a way very similar to
+the Viterbi algorithm except that the operation used at
+each node to combine the incoming cumulated penalties
+instead of being the min function is the socalled logadd
+operation which can be seen as a soft
+ version of the min
+PROC OF THE IEEE NOVEMBER  
+
+function
+fn  logaddiUn
+ci  fsi  
+where fstart   Un is the set of upstream arcs of node n ci is the penalty on arc i and
+logaddx xxn   logXn
+i
+exi  
+Note that because of numerical inaccuracies it is better
+to factorize the largest exi corresponding to the smallest
+penalty out of the logarithm
+An interesting analogy can be drawn if we consider that
+a graph on which we apply the forward algorithm is equiv
+alent to a neural network on which we run a forward prop
+agation except that multiplications are replaced by addi
+tions the additions are replaced by logadds and there are
+no sigmoids
+One way to understand the forward algorithm is to think
+about multiplicative scores eg probabilities instead of
+additive penalties on the arcs score  exp penalty  In
+that case the Viterbi algorithm selects the path with the
+largest cumulative score with scores multiplied along the
+path whereas the forward score is the sum of the cumula
+tive scores associated to each of the possible paths from the
+start to the end node The forward penalty is always lower
+than the cumulated penalty on any of the paths but if one
+path dominates
+ with a much lower penalty its penalty
+is almost equal to the forward penalty The forward algo
+rithm gets its name from the forward pass of the wellknown
+BaumWelsh algorithm for training Hidden Markov Mod
+els 
+ Section VIIIE gives more details on the relation
+between this work and HMMs
+The advantage of the forward penalty with respect to
+the Viterbi penalty is that it takes into account all the
+di	erent ways to produce an answer and not just the one
+with the lowest penalty This is important if there is some
+ambiguity in the segmentation since the combined forward
+penalty of two paths C and C associated with the same
+label sequence may be less than the penalty of a path C
+associated with another label sequence even though the
+penalty of C might be less than any one of C or C The Forward training GTN is only a slight modica
+tion of the previously introduced Viterbi training GTN It
+suces to turn the Viterbi transformers in Figure  into
+Forward Scorers that take an interpretation graph as input
+an produce the forward penalty of that graph on output
+Then the penalties of all the paths that contain the correct
+answer are lowered instead of just that of the best one
+Backpropagating through the forward penalty computa
+tion the forward transformer is quite di	erent from back
+propagating through a Viterbi transformer All the penal
+ties of the input graph have an inuence on the forward
+penalty but penalties that belong to lowpenalty paths
+have a stronger inuence Computing derivatives with re
+spect to the forward penalties fn computed at each n node
+of a graph is done by backpropagation through the graph
+Constrained
+Interpretation Graph
+Recognition
+Transformer
+Interpretation Graph
+Path Selector
+Forward Scorer
+Forward Scorer
+Edforw
+Cforw
+Cdforw
++ −
+Gc
+Gint
+Desired
+Sequence
+Fig  Discriminative Forward Training GTN Architecture
+for a character string recognizer based on Heuristic Over Segmentation
+Gc E
+fn  efn X
+iDn E
+fdi e
+fdi ci 
+where Dn  farc i with source si  ng is the set of down
+stream arcs from node n From the above derivatives the
+derivatives with respect to the arc penalties are obtained
+E
+ci 
+E
+fdi ecifsi fdi 
+This can be seen as a soft
+ version of the backpropagation
+through a Viterbi scorer and transformer All the arcs in
+Gc have an inuence on the loss function The arcs that
+belong to low penalty paths have a larger inuence Back
+propagation through the path selector is the same as before
+The derivative with respect to Gint arcs that have an alter
+ego in Gc are simply copied from the corresponding arc in
+Gc The derivatives with respect to the other arcs are 
+Several authors have applied the idea of back
+propagating gradients through a forward scorer to train
+speech recognition systems including Bridle and his net
+model 
+ and Ha	ner and his TDNN model 
+ but
+these authors recommended discriminative training as de
+scribed in the next section
+D Discriminative Forward Training
+The information contained in the forward penalty can be
+used in another discriminative training criterion which we
+will call the discriminative forward criterion This criterion
+corresponds to maximization of the posterior probability of
+choosing the paths associated with the correct interpreta
+tion This posterior probability is dened as the exponen
+tial of the minus the constrained forward penalty normal
+ized by the exponential of minus the unconstrained forward
+penalty Note that the forward penalty of the constrained
+graph is always larger or equal to the forward penalty of the
+unconstrained interpretation graph Ideally we would like
+the forward penalty of the constrained graph to be equal to
+PROC OF THE IEEE NOVEMBER  
+the forward penalty of the complete interpretation graph
+Equality between those two quantities is achieved when the
+combined penalties of the paths with the correct label se
+quence is negligibly small compared to the penalties of all
+the other paths or that the posterior probability associ
+ated to the paths with the correct interpretation is almost
+ which is precisely what we want The corresponding
+GTN training architecture is shown in gure 
+Let the di	erence be denoted Edforw and let us call
+Ccforw the forward penalty of the constrained graph and
+Cforw the forward penalty of the complete interpretation
+graph
+Edforw  Ccforw  Cforw 
+Edforw is always positive since the constrained graph is a
+subset of the paths in the interpretation graph and the
+forward penalty of a graph is always larger than the for ward penalty of a subgraph of this graph In the ideal case
+the penalties of incorrect paths are innitely large there
+fore the two penalties coincide and Edforw is zero Readers
+familiar with the Boltzmann machine connectionist model
+might recognize the constrained and unconstrained graphs
+as analogous to the clamped
+ constrained by the ob
+served values of the output variable and free
+ uncon
+strained phases of the Boltzmann machine algorithm 
+
+Backpropagating derivatives through the discriminative
+Forward GTN distributes gradients more evenly than in the
+Viterbi case Derivatives are backpropagated through the
+left half of the the GTN in Figure  down to the interpre
+tation graph Derivatives are negated and backpropagated
+through the righthalf and the result for each arc is added
+to the contribution from the left half Each arc in Gint now has a derivative Arcs that are part of a correct path
+have a positive derivative This derivative is very large if
+an incorrect path has a lower penalty than all the correct
+paths Similarly the derivatives with respect to arcs that
+are part of a lowpenalty incorrect path have a large nega
+tive derivative On the other hand if the penalty of a path
+associated with the correct interpretation is much smaller
+than all other paths the loss function is very close to 
+and almost no gradient is backpropagated The training
+therefore concentrates on examples of images which yield a
+classication error and furthermore it concentrates on the
+pieces of the image which cause that error Discriminative
+forward training is an elegant and ecient way of solving
+the infamous credit assignment problem for learning ma
+chines that manipulate dynamic
+ data structures such as
+graphs More generally the same idea can be used in all
+situations where a learning machine must choose between
+discrete alternative interpretations
+As previously the derivatives on the interpretation graph
+penalties can then be backpropagated into the character
+recognizer instances Backpropagation through the char
+acter recognizer gives derivatives on its parameters All the
+gradient contributions for the di	erent candidate segments
+are added up to obtain the total gradient associated to one
+pair input image correct label sequence that is one ex
+ample in the training set A step of stochastic gradient
+descent can then be applied to update the parameters
+E Remarks on Discriminative Training
+In the above discussion the global training criterion was given a probabilistic interpretation but the individ
+ual penalties on the arcs of the graphs were not There are
+good reasons for that For example if some penalties are
+associated to the di	erent class labels they would  have
+to sum to  class posteriors or  integrate to  over the
+input domain likelihoods
+Let us rst discuss the rst case class posteriors normal
+ization This local normalization of penalties may elimi
+nate information that is important for locally rejecting all
+the classes 
+ eg when a piece of image does not cor
+respond to a valid character class because some of the
+segmentation candidates may be wrong Although an ex
+plicit garbage class
+ can be introduced in a probabilistic
+framework to address that question some problems remain
+because it is dicult to characterize such a class probabilis
+tically and to train a system in this way it would require
+a density model of unseen or unlabeled samples
+The probabilistic interpretation of individual variables
+plays an important role in the BaumWelsh algorithm
+in combination with the ExpectationMaximization proce
+du Unfortunately those methods cannot be applied to
+discriminative training criteria and one is reduced to us
+ing gradientbased methods Enforcing the normalization
+of the probabilistic quantities while performing gradient
+based learning is complex inecient time consuming and
+creates illconditioning of the lossfunction
+Following 
+ we therefore prefer to postpone normal
+ization as far as possible in fact until the nal decision
+stage of the system Without normalization the quanti
+ties manipulated in the system do not have a direct prob
+abilistic interpretation
+Let us now discuss the second case using a generative
+model of the input Generative models build the boundary
+indirectly by rst building an independent density model
+for each class and then performing classication decisions
+on the basis of these models This is not a discriminative
+approach in that it does not focus on the ultimate goal of
+learning which in this case is to learn the classication de
+cision surface Theoretical arguments 
+ 
+ suggest that
+estimating input densities when the real goal is to obtain
+a discriminant function for classication is a suboptimal
+strategy In theory the problem of estimating densities in
+highdimensional spaces is much more illposed than nd
+ing decision boundaries
+Even though the internal variables of the system do not
+have a direct probabilistic interpretation the overall sys
+tem can still be viewed as producing posterior probabilities
+for the classes In fact assuming that a particular label se
+quence is given as the desired sequence
+ to the GTN in
+gure  the exponential of minus Edforw can be inter
+preted as an estimate of the posterior probability of that
+label sequence given the input The sum of those posteriors
+for all the possible label sequences is  Another approach would consists of directly minimizing an approximation of
+the number of misclassications 
+ 
+ We prefer to use
+the discriminative forward loss function because it causes
+PROC OF THE IEEE NOVEMBER  
+
+"U"
+Recognizer
+Fig  Explicit segmentation can be avoided by sweeping a recog
+nizer at every possible location in the input eld
+less numerical problems during the optimization We will
+see in Section XC that this is a good way to obtain scores
+on which to base a rejection strategy The important point
+being made here is that one is free to choose any param
+eterization deemed appropriate for a classication model
+The fact that a particular parameterization uses internal variables with no clear probabilistic interpretation does not
+make the model any less legitimate than models that ma
+nipulate normalized quantities
+An important advantage of global and discriminative
+training is that learning focuses on the most important
+errors and the system learns to integrate the ambigui
+ties from the segmentation algorithm with the ambigui
+ties of the character recognizer In Section IX we present
+experimental results with an online handwriting recogni
+tion system that conrm the advantages of using global
+training versus separate training Experiments in speech
+recognition with hybrids of neural networks and HMMs
+also showed marked improvements brought by global train
+ing 
+ 
+ 
+ 
+
+VII Multiple Object Recognition Space
+Displacement Neural Network
+There is a simple alternative to explicitly segmenting im
+ages of character strings using heuristics The idea is to
+sweep a recognizer at all possible locations across a nor
+malized image of the entire word or string as shown in
+Figure  With this technique no segmentation heuris
+tics are required since the system essentially examines al l
+the possible segmentations of the input However there
+are problems with this approach First the method is in
+general quite expensive The recognizer must be applied
+at every possible location on the input or at least at a
+large enough subset of locations so that misalignments of
+characters in the eld of view of the recognizers are small
+enough to have no e	ect on the error rate Second when
+the recognizer is centered on a character to be recognized
+the neighbors of the center character will be present in the
+eld of view of the recognizer possibly touching the cen
+ter character Therefore the recognizer must be able to
+correctly recognize the character in the center of its input
+eld even if neighboring characters are very close to or
+touching the central character Third a word or charac
+ter string cannot be perfectly size normalized Individual
+$
+Fig  A Space Displacement Neural Network is a convolutional
+network that has been replicated over a wide input eld
+characters within a string may have widely varying sizes
+and baseline positions Therefore the recognizer must be very robust to shifts and size variations
+These three problems are elegantly circumvented if a
+convolutional network is replicated over the input eld
+First of all as shown in section III convolutional neu
+ral networks are very robust to shifts and scale varia
+tions of the input image as well as to noise and extra
+neous marks in the input These properties take care of
+the latter two problems mentioned in the previous para
+graph Second convolutional networks provide a drastic
+saving in computational requirement when replicated over
+large input elds A replicated convolutional network also
+called a Space Displacement Neural Network or SDNN 
+
+is shown in Figure  While scanning a recognizer can
+be prohibitively expensive in general convolutional net works can be scanned or replicated very eciently over
+large variablesize input elds Consider one instance of
+a convolutional net and its alter ego at a nearby location
+Because of the convolutional nature of the network units
+in the two instances that look at identical locations on the
+input have identical outputs therefore their states do not
+need to be computed twice Only a thin slice
+ of new
+states that are not shared by the two network inances
+needs to be recomputed When all the slices are put to
+gether the result is simply a larger convolutional network
+whose structure is identical to the original network except
+that the feature maps are larger in the horizontal dimen
+sion In other words replicating a convolutional network
+can be done simply by increasing the size of the elds over
+which the convolutions are performed and by replicating
+the output layer accordingly The output layer e	ectively
+becomes a convolutional layer An output whose receptive
+eld is centered on an elementary ob ject will produce the
+class of this ob ject while an inbetween output may indi
+cate no character or contain rubbish The outputs can be
+interpreted as evidences for the presence of ob jects at all
+possible positions in the input eld
+The SDNN architecture seems particularly attractive for
+PROC OF THE IEEE NOVEMBER  
+recognizing cursive handwriting where no reliable segmen
+tation heuristic exists Although the idea of SDNN is quite
+old and very attractive by its simplicity it has not gener
+ated wide interest until recently because as stated above
+it puts enormous demands on the recognizer 
+ 
+ In
+speech recognition where the recognizer is at least one
+order of magnitude smaller replicated convolutional net works are easier to implement for instance in Ha	ners
+MultiState TDNN model 
+ 
+
+A Interpreting the Output of an SDNN with a GTN
+The output of an SDNN is a sequence of vectors which
+encode the likelihoods penalties or scores of nding char
+acter of a particular class label at the corresponding lo
+cation in the input A postprocessor is required to pull
+out the best possible label sequence from this vector se
+quence An example of SDNN output is shown in Fig
+ure  Very often individual characters are spotted by
+several neighboring instances of the recognizer a conse
+quence of the robustness of the recognizer to horizontal
+translations Also quite often characters are erroneously
+detected by recognizer instances that see only a piece of
+a character For example a recognizer instance that only
+sees the right third of a 
+ might output the label  How
+can we eliminate those extraneous characters from the out
+put sequence and pullout the best interpretation This
+can be done using a new type of Graph Transformer with
+two input graphs as shown in Figure  The sequence of vectors produced by the SDNN is rst coded into a linear
+graph with multiple arcs between pairs of successive nodes
+Each arc between a particular pair of nodes contains the
+label of one of the possible categories together with the
+penalty produced by the SDNN for that class label at that
+location This graph is called the SDNN Output Graph The second input graph to the transformer is a grammar
+transducer more specically a nitestate transducer 
+
+that encodes the relationship between input strings of class
+labels and corresponding output strings of recognized char
+actersThe transducer is a weighted nite state machine a
+graph where each arc contains a pair of labels and possibly
+a penalty Like a nitestate machine a transducer is in a
+state and follows an arc to a new state when an observed
+input symbol matches the rst symbol in the symbol pair
+attached to the arc At this point the transducer emits the
+second symbol in the pair together with a penalty that com
+bines the penalty of the input symbol and the penalty of
+the arc A transducer therefore transforms a weighted sym
+bol sequence into another weighted symbol sequence The
+graph transformer shown in gure  performs a composi
+tion between the recognition graph and the grammar trans
+ducer This operation takes every possible sequence corre
+sponding to every possible path in the recognition graph
+and matches them with the paths in the grammar trans
+ducer The composition produces the interpretation graph
+which contains a path for each corresponding output label
+sequence This composition operation may seem combina
+torially intractable but it turns out there exists an ecient
+algorithm for it described in more details in Section VIII
+Viterbi Transformer
+SDNN
+Transformer
+Compose
+Viterbi Answer
+Character
+Model
+Transducer
+S....c.....r......i....p....t
+s....e.....n.....e.j...o.T
+5......a...i...u......p.....f SDNN Output
+Interpretation Graph
+Viterbi Graph
+Fig  A Graph Transformer pulls out the best interpretation from
+the output of the SDNN
+2 3 3 4 5
+2345
+C1  C5
+F6
+Input
+SDNN
+Output
+Compose + Viterbi
+Answer
+Fig  An example of multiple character recognition with SDNN
+With SDNN no explicit segmentation is performed
+B Experiments with SDNN
+In a series of experiments LeNet was trained with the
+goal of being replicated so as to recognize multiple char
+acters without segmentations The data was generated
+from the previously described Modied NIST set as fol
+lows Training images were composed of a central char
+acter anked by two side characters picked at random in
+the training set The separation between the bounding
+boxes of the characters were chosen at random between 
+and  pixels In other instances no central character was
+present in which case the desired output of the network was the blank space class In addition training images were degraded with ! salt and pepper noise random
+pixel inversions
+Figures  and  show a few examples  success
+ful recognitions of multiple characters by the LeNet
+SDNN Standard techniques based on Heuristic Over
+Segmentation would fail miserably on many of those ex
+amples As can be seen on these examples the network
+exhibits striking invariance and noise resistance properties
+While some authors have argued that invariance requires
+more sophisticated models than feedforward neural net works 
+ LeNet exhibits these properties to a large ex
+tent
+PROC OF THE IEEE NOVEMBER  
+6 7 7 7 8 8
+678
+3 5 5 1 1 4
+3514
+1 1 1 4 4 1
+1114
+5 5 4 0
+540
+Input
+F6
+SDNN
+output
+Answer
+Fig  An SDNN applied to a noisy image of digit string The digits shown in the SDNN output represent the winning class labels with
+a lighter grey level for highpenalty answers
+Similarly it has been suggested that accurate recognition
+of multiple overlapping ob jects require explicit mechanisms
+that would solve the socalled feature binding problem 
+
+As can be seen on Figures  and  the network is able to
+tell the characters apart even when they are closely inter
+twined a task that would be impossible to achieve with the
+more classical Heuristic OverSegmentation technique The
+SDNN is also able to correctly group disconnected pieces
+of ink that form characters Good examples of that are
+shown in the upper half of gure  In the top left ex
+ample the  and the  are more connected to each other
+than they are connected with themselves yet the system
+correctly identies the  and the  as separate ob jects The
+top right example is interesting for several reasons First
+the system correctly identies the three individual ones
+Second the left half and right half of disconnected  are
+correctly grouped even though no geometrical information
+could decide to associate the left half to the vertical bar on
+its left or on its right The right half of the  does cause
+the appearance of an erroneous  on the SDNN output
+but this one is removed by the character model transducer
+which prevents characters from appearing on contiguous
+outputs
+Another important advantage of SDNN is the ease with
+which they can be implemented on parallel hardware Spe
+cialized analogdigital chips have been designed and used
+in character recognition and in image preprocessing appli
+cations 
+ However the rapid progress of conventional
+processor technology with reducedprecision vector arith
+metic instructions such as Intels MMX make the success
+of specialized hardware hypothetical at best
+Short video clips of the LeNet SDNN can be viewed at
+httpwwwresearchattcomyannocr C Global Training of SDNN
+In the above experiments the string image were arti
+cially generated from individual character The advantage
+is that we know in advance the location and the label of
+the important character With real training data the cor
+rect sequence of labels for a string is generally available
+but the precise locations of each corresponding character
+in the input image are unknown
+In the experiments described in the previous section the
+best interpretation was extracted from the SDNN output
+using a very simple graph transformer Global training of
+an SDNN can be performed by backpropagating gradients
+through such graph transformers arranged in architectures
+similar to the ones described in section VI
+PROC OF THE IEEE NOVEMBER  
+Constrained
+Interpretation Graph
+Interpretation Graph
+Path Selector
+Forward Scorer
+Forward Scorer
+Edforw
+Cforw
+Cdforw
++ −
+Gc
+Gint
+Desired
+Sequence
+SDNN
+Transformer
+Compose
+Character
+Model
+Transducer
+S....c.....r......i....p....t
+s....e.....n.....e.j...o.T
+5......a...i...u......p.....f SDNN Output
+Fig  A globally trainable SDNNHMM hybrid system expressed
+as a GTN
+This is somewhat equivalent to modeling the output
+of an SDNN with a Hidden Markov Model Globally
+trained variablesize TDNNHMM hybrids have been used
+for speech recognition and online handwriting recogni
+tion 
+ 
+ 
+ 
+ Space Displacement Neural Net works have been used in combination with HMMs or other
+elastic matching methods for handwritten word recogni
+tion 
+ 
+
+Figure  shows the graph transformer architecture for
+training an SDNNHMM hybrid with the Discriminative
+Forward Criterion The top part is comparable to the top
+part of gure  On the right side the composition of the
+recognition graph with the grammar gives the interpreta
+tion graph with all the possible legal interpretations On
+the left side the composition is performed with a grammar
+that only contains paths with the desired sequence of la
+bels This has a somewhat similar function to the path
+selector used in the previous section Like in Section VID
+the loss function is the di	erence between the forward score
+obtained from the left half and the forward score obtained
+from the right half To backpropagate through the com
+position transformer we need to keep a record of which arc
+in the recognition graph originated which arcs in the inter
+pretation graph The derivative with respect to an arc in
+the recognition graph is equal to the sum of the derivatives
+with respect to all the arcs in the interpretation graph that
+originated from it Derivative can also be computed for the
+penalties on the grammar graph allowing to learn them as well As in the previous example a discriminative criterion must be used because using a nondiscriminative criterion
+could result in a collapse e	ect if the networks output RBF
+are adaptive The above training procedure can be equiv
+alently formulated in term of HMM Early experiments in
+zip code recognition 
+ and more recent experiments in
+online handwriting recognition 
+ have demonstrated the
+idea of globallytrained SDNNHMM hybrids SDNN is an
+extremely promising and attractive technique for OCR but
+so far it has not yielded better results than Heuristic Over
+Segmentation We hope that these results will improve as
+more experience is gained with these models
+D Object Detection and Spotting with SDNN
+An interesting application of SDNNs is ob ject detection
+and spotting The invariance properties of Convolutional
+Networks combined with the eciency with which they
+can be replicated over large elds suggest that they can
+be used for brute force
+ ob ject spotting and detection in
+large images The main idea is to train a single Convolu
+tional Network to distinguish images of the ob ject of inter
+est from images present in the background In utilization
+mode the network is replicated so as to cover the entire
+image to be analyzed thereby forming a twodimensional
+Space Displacement Neural Network The output of the
+SDNN is a twodimensional plane in which activated units
+indicate the presence of the ob ject of interest in the corre
+sponding receptive eld Since the sizes of the ob jects to
+be detected within the image are unknown the image can
+be presented to the network at multiple resolutions and
+the results at multiple resolutions combined The idea has
+been applied to face location 
+ address block location
+on envelopes 
+ and hand tracking in video 
+
+To illustrate the method we will consider the case of
+face detection in images as described in 
+ First images
+containing faces at various scales are collected Those im
+ages are ltered through a zeromean Laplacian lter so as
+to remove variations in global illumination and low spatial
+frequency illumination gradients Then training samples
+of faces and nonfaces are manually extracted from those
+images The face subimages are then size normalized so
+that the height of the entire face is approximately  pixels
+while keeping fairly large variations within a factor of two
+The scale of background subimages are picked at random
+A single convolutional network is trained on those samples
+to classify face subimages from nonface subimages
+When a scene image is to be analyzed it is rst ltered
+through the Laplacian lter and subsampled at powers
+oftwo resolutions The network is replicated over each of multiple resolution images A simple voting technique is
+used to combine the results from multiple resolutions
+A twodimensional version of the global training method
+described in the previous section can be used to allevi
+ate the need to manually locate faces when building the
+training sample 
+ Each possible location is seen as an
+alternative interpretation ie one of several parallel arcs
+in a simple graph that only contains a start node and an
+end node
+Other authors have used Neural Networks or other clas
+siers such as Support Vector Machines for face detection
+with great success 
+ 
+ Their systems are very similar
+to the one described above including the idea of presenting
+the image to the network at multiple scales But since those
+PROC OF THE IEEE NOVEMBER  
+systems do not use Convolutional Networks they cannot
+take advantage of the speedup described here and have to
+rely on other techniques such as preltering and realtime
+tracking to keep the computational requirement within
+reasonable limits In addition because those classiers are much less invariant to scale variations than Convolutional
+Networks it is necessary to multiply the number of scales
+at which the images are presented to the classier
+VIII Graph Transformer Networks and
+Transducers
+In Section IV Graph Transformer Networks GTN were introduced as a generalization of multilayer multi
+module networks where the state information is repre
+sented as graphs instead of xedsize vectors This section
+reinterprets the GTNs in the framework of Generalized
+Transduction and proposes a powerful Graph Composition
+algorithm
+A Previous Work
+Numerous authors in speech recognition have used
+GradientBased Learning methods that integrate graph
+based statistical models notably HMM with acoustic
+recognition modules mainly Gaussian mixture models but
+also neural networks 
+ 
+ 
+ 
+ Similar ideas have
+been applied to handwriting recognition see 
+ for a re
+view However there has been no proposal for a system
+atic approach to multilayer graphbased trainable systems
+The idea of transforming graphs into other graphs has re
+ceived considerable interest in computer science through
+the concept of weighted nitestate transducers 
+ Trans
+ducers have been applied to speech recognition 
+ and
+language translation 
+ and proposals have been made
+for handwriting recognition 
+ This line of work has
+been mainly focused on ecient search algorithms 
+
+and on the algebraic aspects of combining transducers and
+graphs called acceptors in this context but very little
+e	ort has been devoted to building globally trainable sys
+tems out of transducers What is proposed in the follow
+ing sections is a systematic approach to automatic training
+in graphmanipulating systems A di	erent approach to
+graphbased trainable systems called InputOutput HMM was proposed in 
+ 
+
+B Standard Transduction
+In the established framework of nitestate transduc
+ers 
+ discrete symbols are attached to arcs in the graphs
+Acceptor graphs have a single symbol attached to each
+arc whereas transducer graphs have two symbols an input
+symbol and an output symbol A special null symbol is
+absorbed by any other symbol when concatenating sym
+bols to build a symbol sequence Weighted transducers
+and acceptors also have a scalar quantity attached to each
+arc In this framework the composition operation takes as
+input an acceptor graph and a transducer graph and builds
+an output acceptor graph Each path in this output graph
+with symbol sequence Sout corresponds to one path with
+symbol sequence Sin in the input acceptor graph and one
+path and a corresponding pair of inputoutput sequences
+SoutSin in the transducer graph The weights on the arcs
+of the output graph are obtained by adding the weights
+from the matching arcs in the input acceptor and trans
+ducer graphs In the rest of the paper we will call this
+graph composition operation using transducers the 	stan
+dard
+ transduction operation A simple example of transduction is shown in Figure 
+In this simple example the input and output symbols on
+the transducer arcs are always identical This type of trans
+ducer graph is called a grammar graph To better under
+stand the transduction operation imagine two tokens sit
+ting each on the start nodes of the input acceptor graph
+and the transducer graph The tokens can freely follow
+any arc labeled with a null input symbol A token can
+foow an arc labeled with a nonnull input symbol if the
+other token also follows an arc labeled with the same in
+put symbol We have an acceptable trajectory when both
+tokens reach the end nodes of their graphs ie the tokens
+have reached the terminal conguration This tra jectory
+represents a sequence of input symbols that complies with
+both the acceptor and the transducer We can then collect
+the corresponding sequence of output symbols along the
+tra jectory of the transducer token The above procedure
+produces a tree but a simple technique described in Sec
+tion VIIIC can be used to avoid generating multiple copies
+of certain subgraphs by detecting when a particular output
+state has already been seen
+The transduction operation can be performed very e
+ciently 
+ but presents complex bookkeeping problems
+concerning the handling of all combinations of null and non
+null symbols If the weights are interpreted as probabilities
+normalized appropriately then an acceptor graph repre
+sents a probability distribution over the language dened
+by the set of label sequences associated to all possible paths
+from the start to the end node in the graph
+An example of application of the transduction opera
+tion is the incorporation of linguistic constraints a lexicon
+or a grammar when recognizing words or other character
+strings The recognition transformer produces the recog
+nition graph an acceptor graph by applying the neural
+network recognizer to each candidate segment This ac
+ceptor graph is composed with a transducer graph for the
+grammar The grammar transducer contains a path for
+each legal sequence of symbol possibly augmented with
+penalties to indicate the relative likelihoods of the possi
+ble sequences The arcs contain identical input and output
+symbols Another example of transduction was mentioned
+in Section V the path selector used in the heuristic over
+segmentation training GTN is implementable by a compo
+sition The transducer graph is linear graph which con
+tains the correct label sequence The composition of the
+interpretation graph with this linear graph yields the con
+strained graph
+C Generalized Transduction
+If the data structures associated to each arc took only
+a nite number of values composing the input graph and
+PROC OF THE IEEE NOVEMBER  
+an appropriate transducer would be a sound solution For
+our applications however the data structures attached to
+the arcs of the graphs may be vectors images or other
+highdimensional ob jects that are not readily enumerated
+We present a new composition operation that solves this
+problem
+Instead of only handling graphs with discrete symbols
+and penalties on the arcs we are interested in considering
+graphs whose arcs may carry complex data structures in
+cluding continuousvalued data structures such as vectors
+and images Composing such graphs requires additional
+information  When examining a pair of arcs one from each input
+graph we need a criterion to decide whether to create cor
+responding arcs and nodes in the output graph based
+on the information attached to the input arcs We can de
+cide to build an arc several arcs or an entire subgraph
+with several nodes and arcs  When that criterion is met we must build the corre
+sponding arcs and nodes in the output graph and com
+pute the information attached to the newly created arcs
+as a function the the information attached to the input
+arcs
+These functions are encapsulated in an ob ject called a
+Composition Transformer An instance of Composition
+Transformer implements three methods  checkarc arc
+
+compares the data structures pointed to by arcs arc from
+the rst graph and arc from the second graph and re
+turns a boolean indicating whether corresponding arcs
+should be created in the output graph  fpropngraph upnode downnode arc arc
+
+is called when checkarc arc
+ returns true This
+method creates new arcs and nodes between nodes upnode
+and downnode in the output graph ngraph and computes
+the information attached to these newly created arcs as a
+function of the attached information of the input arcs arc
+and arc  bpropngraph upnode downnode arc arc
+
+is called during training in order to propagate gradient in
+formation from the output subgraph between upnode and
+downnode into the data structures on the arc and arc as well as with respect to the parameters that were used in
+the fprop call with the same arguments This assumes that
+the function used by fprop to compute the values attached
+to its output arcs is di	erentiable
+The check method can be seen as constructing a dy
+namic architecture of functional dependencies while the
+fprop method performs a forward propagation through
+that architecture to compute the numerical information at
+tached to the arcs The bprop method performs a back ward propagation through the same architecture to com
+pute the partial derivatives of the loss function with respect
+to the information attached to the arcs This is illustrated
+in Figure 
+Figure  shows a simplied generalized graph composi
+tion algorithm This simplied algorithm does not handle null transitions and does not check whether the tokens tra
+"o"
+"c"
+"d"
+"x"
+"a"
+"u"
+"p"
+"t"
+0.4
+1.0
+1.8
+0.1
+0.2
+0.8
+0.2
+0.8
+Recognition
+Graph
+"b"
+"c"
+"a"
+"u"
+"u"
+"a"
+"r" "n"
+"t"
+"t"
+"r"
+"e"
+"e"
+"p"
+"t" "r" "d"
+"c"
+"u"
+"a"
+"t"
+"p"
+"t"
+0.4 0.2
+0.8
+0.8
+0.2
+0.8
+Graph Composition
+interpretation graph
+match
+& add match
+& add
+match
+& add
+interpretations:
+cut (2.0)
+cap (0.8)
+cat (1.4)
+grammar graph
+Fig  Example of composition of the recognition graph with
+the grammar graph in order to build an interpretation that is
+consistent with both of them During the forward propagation
+dark arrows the methods check and fprop are used Gradients
+dashed arrows are backpropagated with the application of the
+method bprop
+jectory is acceptable ie both tokens simultaneously reach
+the end nodes of their graphs The management of null
+transitions is a straightforward modication of the token
+simulation function Before enumerating the possible non
+null joint token transitions we loop on the possible null
+transitions of each token recursively call the token sim
+ulation function and nally call the method fprop The
+safest way for identifying acceptable tra jectories consists in
+running a preliminary pass for identifying the token con
+gurations from which we can reach the terminal congu
+ration ie both tokens on the end nodes This is easily
+achieved by enumerating the tra jectories in the opposite
+direction We start on the end nodes and follow the arcs
+upstream During the main pass we only build the nodes
+that allow the tokens to reach the terminal conguration
+Graph composition using transducers ie standard
+transduction is easily and eciently implemented as a gen
+eralized transduction The method check simply tests the
+equality of the input symbols on the two arcs and the
+method fprop creates a single arc whose symbol is the
+output symbol on the transducers arc
+The composition between pairs of graphs is particularly
+useful for incorporating linguistic constraints in a hand
+writing recognizer Examples of its use are given in the
+online handwriting recognition system described in Sec
+tion IX and in the check reading system described in Sec
+tion X
+In the rest of the paper the term Composition Trans
+former will denote a Graph Transformer based on the gen
+eralized transductions of multiple graphs The concept of
+generalized transduction is a very general one In fact
+many of the graph transformers described earlier in this
+paper such as the segmenter and the recognizer c
+PROC OF THE IEEE NOVEMBER  
+Function generalizedcompositionPGRAPH graph
+PGRAPH graph
+PTRANS trans
+
+Returns PGRAPH
+
+ Create new graph
+PGRAPH ngraph  newgraph
+
+ Create map between token positions
+ and nodes of the new graph
+PNODE mapPNODEPNODE  newemptymap
+
+mapendnodegraph
+ endnodegraph
+ 
+endnodenewgraph
+
+ Recursive subroutine for simulating tokens
+Function simtokensPNODE node PNODE node
+
+Returns PNODE
+
+PNODE currentnode  mapnode node
+ Check if already visited
+If currentnode  nil
+
+ Record new configuration
+currentnode  ngraphcreatenode
+
+mapnode node  currentnode
+ Enumerate the possible nonnull
+ joint token transitions
+For ARC arc in downarcsnode
+
+For ARC arc in downarcsnode
+
+If transcheckarc arc
+
+
+PNODE newnode 
+simtokensdownnodearc
+
+downnodearc
+
+
+transfpropngraph currentnode
+newnode arc arc
+
+ Return node in composed graph
+Return currentnode
+
+ Perform token simulation
+simtokensstartnodegraph
+ startnodegraph
+
+
+Delete map
+Return ngraph
+
+Fig  Pseudocode for a simplied generalized composition algo
+rithm For simplifying the presentation we do not handle null
+transitions nor implement dead end avoidance The two main
+component of the composition appear clearly here	 a the re
+cursive function simtoken enumerating the token tra jectories
+and b the associative array map used for remembering which
+nodes of the composed graph have been visited
+formulated in terms of generalized transduction In this
+case the the generalized transduction does not take two in
+put graphs but a single input graph The method fprop of
+the transformer may create several arcs or even a complete
+subgraph for each arc of the initial graph In fact the pair
+check fprop
+ itself can be seen as procedurally dening
+a transducer
+In addition It can be shown that the generalized trans
+duction of a single graph is theoretically equivalent to the
+standard composition of this graph with a particular trans
+ducer graph However implementing the operation this way may be very inecient since the transducer can be very complicated
+In practice the graph produced by a generalized trans
+duction is represented procedurally in order to avoid build
+ing the whole output graph which may be huge when for
+example the interpretation graph is composed with the
+grammar graph We only instantiate the nodes which
+are visited by the search algorithm during recognition eg
+Viterbi This strategy propagates the benets of pruning
+algorithms eg Beam Search in all the Graph Transformer
+Network
+D Notes on the Graph Structures
+Section VI has discussed the idea of global training
+by backpropagating gradient through simple graph trans
+formers The bprop method is the basis of the back
+propagation algorithm for generic graph transformers A
+generalized composition transformer can be seen as dam
+ically establishing functional relationships between the nu
+merical quantities on the input and output arcs Once the
+check function has decided that a relationship should be es
+tablished the fprop function implements the numerical re
+lationship The check function establishes the structure of
+the ephemeral network inside the composition transformer
+Since fprop is assumed to be di	erentiable gradients can
+be backpropagated through that structure Most param
+eters a	ect the scores stored on the arcs of the successive
+graphs of the system A few threshold parameters may de
+termine whether an arc appears or not in the graph Since
+non existing arcs are equivalent to arcs with very large
+penalties we only consider the case of parameters a	ect
+ing the penalties
+In the kind of systems we have discussed until now and
+the application described in Section X much of the knowl
+edge about the structure of the graph that is produced by
+a Graph Transformer is determined by the nature of the
+Graph Transformer but it may also depend on the value
+of the parameters and on the input It may also be interest
+ing to consider Graph Transformer modules which attempt
+to learn the structure of the output graph This might
+be considered a combinatorial problem and not amenable
+to GradientBased Learning but a solution to this prob
+lem is to generate a large graph that contains the graph
+candidates as subgraphs and then select the appropriate
+subgraph
+PROC OF THE IEEE NOVEMBER  	
+E GTN and Hidden Markov Models
+GTNs can be seen as a generalization and an extension of
+HMMs On the one hand the probabilistic interpretation
+can be either kept with penalties being logprobabilities
+pushed to the nal decision stage with the di	erence of the
+constrained forward penalty and the unconstrained forward
+penalty being interpreted as negative logprobabilities of
+label sequences or dropped altogether the network just
+represents a decision surface for label sequences in input
+space On the other hand Graph Transformer Networks
+extend HMMs by allowing to combine in a wellprincipled
+framework multiple levels of processing or multiple mod
+els eg Pereira et al have been using the transducer
+framework for stacking HMMs representing di	erent levels
+of processing in automatic speech recognition 
+
+Unfolding a HMM in time yields a graph that is very sim
+ilar to our interpretation graph at the nal stage of pro
+cessing of the Graph Transformer Network before Viterbi
+recognition It has nodes nt i associated to each time
+step t and state i in the model The penalty ci for an arc
+from nt   j to nt i then corresponds to the nega
+tive logprobability of emitting observed data ot at posi
+tion t and going from state j to state i in the time interval
+t   t With this probabilistic interpretation the for ward penalty is the negative logarithm of the likelihood of
+whole observed data sequence given the model
+In Section VI we mentioned that the collapsing phe
+nomenon can occur when nondiscriminative loss functions
+are used to train neural networksHMM hybrid systems
+With classical HMMs with xed preprocessing this prob
+lem does not occur because the parameters of the emission
+and transition probability models are forced to satisfy cer
+tain probabilistic constraints the sum or the integral of
+the probabilities of a random variable over its possible val
+ues must be  Therefore when the probability of certain
+events is increased the probability of other events must au
+tomatically be decreased On the other hand if the prob
+abilistic assumptions in an HMM or other probabilistic
+model are not realistic discriminative training discussed
+in Section VI can improve performance as this has been
+clearly shown for speech recognition systems 
+ 
+ 
+
+
+ 
+
+The InputOutput HMM model IOHMM 
+ 
+
+is strongly related to graph transformers Viewed as a
+probabilistic model an IOHMM represents the conditional
+distribution of output sequences given input sequences of
+the same or a di	erent length It is parameterized from
+an emission probability module and a transition probabil
+ity module The emission probability module computes
+the conditional emission probability of an output variable
+given an input value and the value of discrete state
+ vari
+able The transition probability module computes condi
+tional transition probabilities of a change in the value of
+the state
+ variable given the an input value Viewed as a
+graph transformer it assigns an output graph representing
+a probability distribution over the sequences of the output variable to each path in the input graph All these output
+graphs have the same structure and the penalties on their
+arcs are simply added in order to obtain the complete out
+put graph The input values of the emission and transition
+modules are read o	 the data structure on the input arcs
+of the IOHMM Graph Transformer In practice the out
+put graph may be very large and needs not be completely
+instantiated ie it is pruned only the low penalty paths
+are created
+IX An OnLine Handwriting Recognition System
+Natural handwriting is often a mixture of di	erent
+styl
+ lower case printed upper case and cursive A
+reliable recognizer for such handwriting would greatly im
+rove interaction with penbased devices but its imple
+mentation presents new technical challenges Characters
+taken in isolation can be very ambiguous but consider
+able information is available from the context of the whole word We have built a word recognition system for pen
+based devices based on four main modules a preprocessor
+that normalizes a word or word group by tting a geomet
+rical model to the word structure$ a module that produces
+an annotated image
+ from the normalized pen tra jectory$
+a replicated convolutional neural network that spots and
+recognizes characters$ and a GTN that interprets the net works output by taking wordlevel constraints into account
+The network and the GTN are jointly trained to minimize
+an error measure dened at the word level
+In this work we have compared a system based on
+SDNNs such as described in Section VII and a system
+based on Heuristic OverSegmentation such as described
+in Section V cause of the sequential nature of the infor
+mation in the pen tra jectory which reveals more informa
+tion than the purely optical input from in image Heuristic
+OverSegmentation can be very ecient in proposing can
+didate character cuts especially for noncursive script
+A Preprocessing
+Input normalization reduces intracharacter variability simplifying character recognition We have used a word
+normalization scheme 
+ based on tting a geometrical
+model of the word structure Our model has four exi
+ble
+ lines representing respectively the ascenders line the
+core line the base line and the descenders line The lines
+are tted to local minima or maxima of the pen tra jectory The parameters of the lines are estimated with a modied
+version of the EM algorithm to maximize the joint prob
+ability of observed points and parameter values using a
+prior on parameters that prevents the lines from collapsing
+on each other
+The recognition of handwritten characters from a pen
+tra jectory on a digitizing surface is often done in the time
+domain 
+ 
+ 
+ Typically tra jectories are nor
+malized and local geometrical or dynamical features are
+extracted The recognition may then be performed us
+ing curve matching 
+ or other classication techniques
+such as TDNNs 
+ 
+ While these representations
+have several advantages their dependence on stroke order
+ing and individual writing styles makes them dicult to
+PROC OF THE IEEE NOVEMBER  
+
+"Script"
+Viterbi Graph
+Segmentation Graph
+Recognition Graph
+Compose
+Recognition
+Transformer
+Segmentation
+Transformer
+Word Normalization
+Normalized Word
+Interpretation Graph
+Language
+Model
+AMAP Computation
+AMAP Graph
+Beam Search
+Transformer
+Fig  An online handwriting recognition GTN based on heuristic oversegmentation
+use in high accuracy writer independent systems that in
+tegrate the segmentation with the recognition
+Since the intent of the writer is to produce a legible im
+age it seems natural to preserve as much of the pictorial
+nature of the signal as possible while at the same time ex
+ploit the sequential information in the tra jectory For this
+purpose we have designed a representation scheme called
+AMAP 
+ where pen tra jectories are represented by low resolution images in which each picture element contains
+information about the local properties of the tra jectory An
+AMAP can be viewed as an annotated image
+ in which
+each pixel is a element feature vector  features are as
+sociated to four orientations of the pen tra jectory in the
+area around the pixel and the fth one is associated to
+local curvature in the area around the pixel A particu
+larly useful feature of the AMAP representation is that it
+makes very few assumptions about the nature of the input
+tra jectory It does not depend on stroke ordering or writ
+ing speed and it can be used with all types of handwriting
+capital lower case cursive punctuation symbols Un
+like many other representations such as global features
+AMAPs can be computed for complete words without re
+quiring segmentation
+Recognition Graph
+Compose
+Word Normalization
+Normalized Word
+Interpretation Graph
+"Script"
+AMAP Computation
+SDNN
+Transformer
+AMAP
+Compose Character
+Model
+Language
+Model
+Viterbi Graph
+SDNN Output
+Beam Search
+Transformer
+Fig  An online handwriting recognition GTN based on Space
+Displacement Neural Network
+B Network Architecture
+One of the best networks we found for both online and
+o%ine character recognition is a layer convolutional net work somewhat similar to LeNet Figure  but with multiple input planes and di	erent numbers of units on the
+last two layers$ layer  convolution with  kernels of size
+x layer  x subsampling layer  convolution with
+ kernels of size x layer  convolution with  kernels
+of size x layer  x subsampling classication layer
+ RBF units one per class in the full printable ASCII
+set The distributed codes on the output are the same as
+for LeNet except they are adaptive unlike with LeNet
+When used in the heuristic oversegmentation system the
+input to above network consisted of an AMAP with ve
+planes  rows and  columns It was determined that
+this resolution was sucient for representing handwritten
+characters In the SDNN version the number of columns was varied according to the width of the input word Once
+the number of subsampling layers and the sizes of the ker
+nels are chosen the sizes of all the layers including the
+input are determined unambiguously The only architec
+tural parameters that remain to be selected are the num
+ber of feature maps in each layer and the information as
+to what feature map is connected to what other feature
+map In our case the subsampling rates were chosen as
+small as possible x and the kernels as small as pos
+PROC OF THE IEEE NOVEMBER  
+sible in the rst layer x to limit the total number of
+connections Kernel sizes in the upper layers are chosen to
+be as small as possible while satisfying the size constraints
+mentioned above Larger architectures did not necessarily
+perform better and required considerably more time to be
+trained A very small architecture with half the input eld
+also performed worse because of insucient input resolu
+tion Note that the input resolution is nonetheless much
+less than for optical character recognition because the an
+gle and curvature provide more information than would a
+single grey level at each pixel
+C Network Training
+Training proceeded in two phases First we kept the
+centers of the RBFs xed and trained the network weights
+so as to minimize the output distance of the RBF unit
+corresponding to the correct class This is equivalent to
+minimizing the meansquared error between the previous
+layer and the center of the correctclass RBF This boot
+strap phase was performed on isolated characters In the
+second phase all the parameters network weights and RBF
+centers were trained globally to minimize a discriminative
+criterion at the word level
+With the Heuristic OverSegmentation approach the
+GTN was composed of four main Graph Transformers
+ The Segmentation Transformer performs the
+Heuristic OverSegmentation and outputs the segmenta
+tion graph An AMAP is then computed for each image
+attached to the arcs of this graph
+ The Character Recognition Transformer applies
+the the convolutional network character recognizer to each
+candidate segment and outputs the recognition graph
+with penalties and classes on each arc
+ The Composition Transformer composes the recog
+nition graph with a grammar graph representing a language
+model incorporating lexical constraints
+ The Beam Search Transformer extracts a good inter
+pretation from the interpretation graph This task could
+have been achieved with the usual Viterbi Transformer
+The Beam Search algorithm however implements pruning
+strategies which are appropriate for large interpretation
+graphs
+With the SDNN approach the main Graph Transformers
+are the following
+ The SDNN Transformer replicates the convolutional
+network over the a whole word image and outputs a recog
+nition graph that is a linear graph with class penalties for
+every window centered at regular intervals on the input
+image
+ The CharacterLevel Composition Transformer
+composes the recognition graph with a lefttoright HMM
+for each character class as in Figure 
+ The WordLevel Composition Transformer com
+poses the output of the previous transformer with a lan
+guage model incorporating lexical constraints and outputs
+the interpretation graph
+ The Beam Search Transformer extracts a good in
+terpretation from the interpretation graph
+In this application the language model simply constrains
+the nal output graph to represent sequences of character
+labels from a given dictionary Furthermore the interpre
+tation graph is not actually completely instantiated the
+only nodes created are those that are needed by the Beam
+Search module The interpretation graph is thereforrep
+resented procedurally rather than explicitly A crucial contribution of this research was the joint train
+ing of all graph transformer modules within the network
+with respect to a single criterion as explained in Sec
+tions VI and VIII We used the Discriminative Forward loss
+function on the nal output graph minimize the forward
+penalty of the constrained interpretation ie along all the
+correct
+ paths while maximizing the forward penalty of
+the whole interpretation graph ie along all the paths
+During global training the loss function was optimized
+with the stochastic diagonal LevenbergMarquardt proce
+dure described in Appendix C that uses second derivatives
+to compute optimal learning rates This optimization op
+erates on al l the parameters in the system most notably
+the network weights and the RBF centers
+D Experimental Results
+In the rst set of experiments we evaluated the general
+ization ability of the neural network classier coupled with
+the word normalization preprocessing and AMAP input
+representation All results are in writer independent mode
+di	erent writers in training and testing Initial train
+ing on isolated characters was performed on a database of
+approximately  hand printed characters  classes
+of upper case lower case digits and punctuation Tests
+on a database of isolated characters were performed sepa
+rately on the four types of characters upper case !
+error on  patterns lower case ! error on 
+patterns digits! error on  patterns and punc
+tuation ! error on  patterns Experiments were
+performed with the network architecture described above
+To enhance the robustness of the recognizer to variations
+in position size orientation and other distortions addi
+tional training data was generated by applying local ane
+transformations to the original characters
+The second and third set of experiments concerned the
+recognition of lower case words writer independent The
+tests were performed on a database of  words First we evaluated the improvements brought by the word nor
+malization to the system For the SDNNHMM system
+we have to use wordlevel normalization since the net work sees one whole word at a timWith the Heuris
+tic OverSegmentation system and before doing any word
+level training we obtained with characterlevel normaliza
+tion ! and ! word and character errors adding in
+sertions deletions and substitutions when the search was
+constrained within a word dictionary When using
+the word normalization preprocessing instead of a charac
+ter level normalization error rates dropped to ! and
+! for word and character errors respectively ie a rel
+ative drop of ! and ! in word and character error
+respectively This suggests that normalizing the word in
+PROC OF THE IEEE NOVEMBER  
+
+its entirety is better than rst segmenting it and then nor
+malizing and processing each of the segments
+ No Language Model
+12.4
+8.2
+ No Language Model
+8.5
+6.3
+ 25K Word Lexicon
+2
+1.4
+0 5 10 15
+SDNN/HMM
+no global training
+with global training
+no global training
+with global training
+no global training
+with global training
+HOS
+HOS
+Fig  Comparative results character error rates showing the
+improvement brought by global training on the SDNNHMM
+hybrid and on the Heuristic OverSegmentation system HOS
+without and with a  words dictionary
+In the third set of experiments we measured the im
+provements obtained with the joint training of the neural
+network and the postprocessor with the wordlevel crite
+rion in comparison to training based only on the errors
+performed at the character level After initial training on
+individual characters as above global wordlevel discrim
+inative training was performed with a database of 
+lower case words For the SDNNHMM system without
+any dictionary constraints the error rates dropped from
+! and ! word and character error to ! and !
+respectively after wordlevel training ie a relative drop
+of ! and ! For the Heuristic OverSegmentation sys
+tem and a slightly improved architecture without any dic
+tionary constraints the error rates dropped from !
+and ! word and character error to ! and ! re
+spectively ie a relative drop of ! and ! With a
+word dictionary errors dropped from ! and !
+word and character errors to ! and ! respectively
+after wordlevel training ie a relative drop of ! and
+! Even lower error rates can be obtained by dras
+tically reducing the size of the dictionary to  words
+yielding ! and ! word and character errors
+These results clearly demonstrate the usefulness of glob
+ally trained NeuralNetHMM hybrids for handwriting
+recognition This conrms similar results obtained earlier
+in speech recognition 
+
+X A Check Reading System
+This section describes a GTN based Check Reading Sys
+tem intended for immediate industrial deployment It also
+shows how the use of Gradient BasedLearning and GTNs
+make this deployment fast and coste	ective while yielding
+an accurate and reliable solution
+The verication of the amount on a check is a task that
+is extremely time and money consuming for banks As a
+consequence there is a very high interest in automating the
+process as much as possible see for example 
+ 
+
+
+ Even a partial automation would result in consid
+erable cost reductions The threshold of economic viability
+for automatic check readers as set by the bank is when
+! of the checks are read with less than ! error The
+other ! of the check being rejected and sent to human
+operators In such a case we describe the performance of
+the system as  correct 
+  reject 
+  error The
+system presented here was one of the rst to cross that
+threshold on representative mixtures of business and per
+sonal checks
+Checks contain at least two versions of the amount The
+Courtesy amount is written with numerals while the Legal
+amount is written with letters On business checks which
+are generally machineprinted these amounts are relatively
+easy to read but quite dicult to nd due to the lack of
+standard for business check layout On the other hand
+these amounts on personal checks are easy to nd but much
+harder to read
+For simplicity and speed requirements our initial task
+is to read the Courtesy amount only This task consists of
+two main steps  The system has to nd among all the elds lines of
+text the candidates that are the most likely to contain the
+courtesy amount This is obvious for many personal checks
+where the position of the amount is standardized However
+as already noted nding the amount can be rather dicult
+in business checks even for the human eye There are
+many strings of digits such as the check number the date
+or even not to exceed
+ amounts that can be confused
+with the actual amount In many cases it is very dicult
+to decide which candidate is the courtesy amount before
+performing a full recognition  In order to read and choose some Courtesy amount
+candidates the system has to segment the elds into char
+acters read and score the candidate characters and nally
+nd the best interpretation of the amount using contextual
+knowledge represented by a stochastic grammar for check
+amounts
+The GTN methodology was used to build a check amount
+reading system that handles both personal checks and busi
+ness checks
+A A GTN for Check Amount Recognition
+We now describe the successive graph transformations
+that allow this network to read the check amount cf Fig
+ure  Each Graph Transformer produces a graph whose
+paths encode and score the current hypotheses considered
+at this stage of the system
+The input to the system is a trivial graph with a single
+arc that carries the image of the whole check cf Figure 
+The eld location transformer Tf ield rst performs
+classical image analysis including connected component
+analysis ink density histograms layout analysis etc
+and heuristically extracts rectangular zones that may con
+tain the check amount Tf ield produces an output graph
+called the eld graph cf Figure  such that each can
+didate zone is associated with one arc that links the start
+node to the end node Each arc contains the image of the
+zone and a penalty term computed from simple features
+extracted from the zone absolute position size aspect ra
+tio etc The penalty term is close to zero if the features
+suggest that the eld is a likely candidate and is large if
+the eld is deemed less likely to be an amount The penal
+PROC OF THE IEEE NOVEMBER  
+Segmentation Graph
+Interpretation Graph
+Grammar
+Recognition Graph
+Field Graph
+Check Graph
+Best Amount Graph
+Compose
+2nd Nat. Bank
+$ *** 3.45
+three dollars and 45/xx
+not to exceed $10,000.00
+$ *** 3.45
+$10,000.00 45/xx
+$ * 3
+** 45
+"$" 0.2
+"*" 0.4
+"3" 0.1
+"B" 23.6
+.......
+"$" 0.2
+"*" 0.4
+"3" 0.1
+.......
+Recognition
+Transformer
+Segmentation Transf.
+Field Location Transf.
+Viterbi Answer
+Viterbi Transformer
+Fig  A complete check amount reader implemented as a single
+cascade of Graph Transformer modules Successive graph trans
+formations progressively extract higher level information
+function is di	erentiable therefore its parameter are glob
+ally tunable
+An arc may represent separate dollar and cent amounts
+as a sequence of elds In fact in handwritten checks the
+cent amount may be written over a fractional bar and not
+aligned at all with the dollar amount In the worst case
+one may nd several cent amount candidates above and
+below the fraction bar for the same dollar amount
+The segmentation transformer Tseg  similar to the
+one described in Section VIII examines each zone contained
+in the eld graph and cuts each image into pieces of ink
+using heuristic image processing techniques Each piece
+of ink may be a whole character or a piece of character
+Each arc in the eld graph is replaced by its correspond
+ing segmentation graph that represents all possible group
+ings of pieces of ink Each eld segmentation graph is ap
+pended to an arc that contains the penalty of the eld in
+the eld graph Each arc carries the segment image to
+gether with a penalty that provides a rst evaluation of
+the likelihood that the segment actually contains a charac
+ter This penalty is obtained with a di	erentiable function
+that combines a few simple features such as the space be
+tween the pieces of ink or the compliance of the segment
+image with a global baseline and a few tunable parame
+ters The segmentation graph represents al l the possible
+segmentations of al l the eld images We can compute the
+penalty for one segmented eld by adding the arc penalties
+along the corresponding path As before using a di	eren
+tiable function for computing the penalties will ensure that
+the parameters can be optimized globally
+The segmenter uses a variety of heuristics to nd candi
+date cut One of the most important ones is called hit and
+deect
+ 
+ The idea is to cast lines downward from the
+top of the eld image When a line hits a black pixel it is
+deected so as to follow the contour of the ob ject When a
+line hits a local minimum of the upper prole ie when it
+cannot continue downward without crossing a black pixel
+it is just propagated vertically downward through the ink
+When two such lines meet each other they are merged into
+a single cut The procedure can be repeated from the bot
+tom up This strategy allows the separation of touching
+characters such as double zeros
+The recognition transformer Trec iterates over all
+segment arcs in the segmentation graph and runs a charac
+ter recognizer on the corresponding segment image In our
+case the recognizer is LeNet the Convolutional Neural
+Network described in Section II whose weights constitute
+the largest and most important subset of tunable parame
+ters The recognizer classies segment images into one of
+ classes full printable ASCII set plus a rubbish class for
+unknown symbols or badlyformed characters Each arc in
+the input graph Trec is replaced by  arcs in the output
+graph Each of those  arcs contains the label of one of
+the classes and a penalty that is the sum of the penalty
+of the corresponding arc in the input segmentation graph
+and the penalty associated with classifying the image in
+the corresponding class as computed by the recognizer In
+other words the recognition graph represents a weighted
+trellis of scored character classes Each path in this graph
+represents a possible character string for the correspond
+ing eld We can compute a penalty for this interpretation
+by adding the penalties along the path This sequence of
+characters may or may not be a valid check amount
+The composition transformer Tgram selects the
+paths of the recognition graph that represent valid char
+acter sequences for check amounts This transformer takes
+two graphs as input the recognition graph and the gram
+mar graph The grammar graph contains all possible se
+quences of symbols that constitute a wellformed amount
+The output of the composition transformer called the in
+terpretation graph contains all the paths in the recognition
+graph that are compatible with the grammar The oper
+ation that combines the two input graphs to produce the
+output is a generalized transduction see Section VIIIA
+di	erentiable function is used to compute the data attached
+o the output arc from the data attached to the input arcs
+In our case the output arc receives the class label of the
+two arcs and a penalty computed by simply summing the
+penalties of the two input arcs the recognizer penalty and
+the arc penalty in the grammar graph Each path in the
+interpretation graph represents one interpretation of one
+segmentation of one eld on the check The sum of the
+penalties along the path represents the badness
+ of the
+corresponding interpretation and combines evidence from
+each of the modules along the process as well as from the
+graar
+The Viterbi transformer nally selects the path with
+the lowest accumulated penalty corresponding to the best
+PROC OF THE IEEE NOVEMBER  
+Interpretation Graph
+Path Selector
+Forward Scorer
+Forward Scorer
+Edforw
+Cforw
+Cdforw
++ −
+Viterbi
+Answer
+Fig  Additional processing required to compute the condence
+grammatically correct interpretations
+B GradientBased Learning
+Each stage of this check reading system contains tun
+able parameters While some of these parameters could be
+manually adjusted for example the parameters of the eld
+locator and segmenter the vast ma jority of them must be
+learned particularly the weights of the neural net recog
+nizer
+Prior to globally optimizing the system each module pa
+rameters are initialized with reasonable values The param
+eters of the eld locator and the segmenter are initialized
+by hand while the parameters of the neural net charac
+ter recognizer are initialized by training on a database of
+presegmented and labeled characters Then the entire
+system is trained globally from whole check images labeled
+with the correct amount No explicit segmentation of the
+amounts is needed to train the system it is trained at the
+check level
+The loss function E minimized by our global train
+ing procedure is the Discriminative Forward criterion de
+scribed in Section VI the di	erence between a the for ward penalty of the constrained interpretation graph con
+strained by the correct label sequence and b the forward
+penalty of the unconstrained interpretation graph Deriva
+tives can be backpropagated through the entire structure
+although it only practical to do it down to the segmenter
+C Rejecting Low Condence Checks
+In order to be able to reject checks which are the most
+likely to carry erroneous Viterbi answers we must rate
+them with a condence and reject the check if this con
+dence is below a given threshold To compare the un
+normalized Viterbi Penalties of two di	erent checks would
+be meaningless when it comes to decide which answer we
+trust the most
+The optimal measure of condence is the probability of
+the Viterbi answer given the input image As seen in Sec
+tion VIE given a target sequence which in this case would be the Viterbi answer the discriminative forward
+loss function is an estimate of the logarithm of this prob
+ability Therefore a simple solution to obtain a good esti
+mate of the condence is to reuse the interpretation graph
+see Figure  to compute the discriminative forward loss
+as described in Figure  using as our desired sequence the
+Viterbi answer This is summarized in Figure  with
+condence  expEdforw
+D Results
+A version of the above system was fully implemented
+and tested on machineprint business checks This sys
+tem is basically a generic GTN engine with task specic
+heuristics encapsulated in the check and fprop method
+As a consequence the amount of code to write was min
+imal mostly the adaptation of an earlier segmenter into
+the segmentation transformer The system that deals with
+handwritten or personal checks was based on earlier im
+plementations that used the GTN concept in a restricted way The neural network classier was initially trained on
+ images of character images from various origins
+spanning the entire printable ASCII set This contained
+both handwritten and machineprinted characters that had
+been previously size normalized at the string level Addi
+tional images were generated by randomly distorting the
+original images using simple ane transformations of the
+images The network was then further trained on character
+images that had been automatically segmented from check
+images and manually truthed The network was also ini
+tially trained to reject noncharacters that resulted from
+segmentation errors The recognizer was then inserted
+the check reading system and a small subset of the parame
+ters were trained globally at the eld level on whole check
+images
+On  business checks that were automatically catego
+rized as machine printed the performance was ! cor
+rectly recognized checks ! errors and ! rejects This
+can be compared to the performance of the previous sys
+tem on the same test set ! correct ! errors and
+! rejects A check is categorized as machineprinted
+when characters that are near a standard position Dollar
+sign are detected as machine printed or when if nothing
+is found in the standard position at least one courtesy
+amount candidate is found somewhere else The improve
+ment is attributed to three main causes First the neural
+network recognizer was bigger and trained on more data
+Second because of the GTN architecture the new system
+could take advantage of grammatical constraints in a much
+more eent way than the previous system Third the
+GTN architecture provided extreme exibility for testing
+heuristics adjusting parameters and tuning the system
+This last point is more important than it seems The GTN
+framework separates the algorithmic
+ part of the system
+from the kwledgebased
+ part of the system allowing
+easy adjustmes of the latter The importance of global
+training was only minor in this task because the global
+training only concerned a small subset of the parameters
+An independent test performed by systems integrators
+in  showed the superiority of this system over other
+commercial Courtesy amount reading systems The system
+was integrated in NCRs line of check reading systems It
+PROC OF THE IEEE NOVEMBER  	
+has been elded in several banks across the US since June
+ and has been reading millions of checks per day since
+then
+XI Conclusions
+During the short history of automatic pattern recogni
+tion increasing the role of learning seems to have invari
+ably improved the overall performance of recognition sys
+tems The systems described in this paper are more ev
+idence to this fact Convolutional Neural Networks have
+been shown to eliminate the need for handcrafted fea
+ture extractors Graph Transformer Networks have been
+shown to reduce the need for handcrafted heuristics man
+ual labeling and manual parameter tuning in document
+recognition systems As training data becomes plentiful as
+computers get faster as our understanding of learning al
+gorithms improves recognition systems will rely more and
+more of learning and their performance will improve
+Just as the backpropagation algorithm elegantly solved
+the credit assignment problem in multilayer neural net works the gradientbased learning procedure for Graph
+Transformer Networks introduced in this paper solves the
+credit assignment problem in systems whose functional ar
+chitecture dynamically changes with each new input The
+learning algorithms presented here are in a sense nothing
+more than unusual forms of gradient descent in complex
+dynamic architectures with ecient backpropagation al
+gorithms to compute the gradient The results in this pa
+per help establish the usefulness and relevance of gradient
+based minimization methods as a general organizing prin
+ciple for learning in large systems
+It was shown that all the steps of a document analysis
+system can be formulated as graph transformers through
+which gradients can be backpropagated Even in the
+nontrainable parts of the system the design philosophy
+in terms of graph transformation provides a clear separa
+tion between domainspecic heuristics eg segmentation
+heuristics and generic procedural knowledge the gener
+alized transduction algorithm
+It is worth pointing out that data generating models
+such as HMMs and the Maximum Likelihood Principle were not called upon to justify most of the architectures
+and the training criteria described in this paper Gradient
+based learning applied to global discriminative loss func
+tions guarantees optimal classication and rejection with
+out the use of hard to justify
+ principles that put strong
+constraints on the system architecture often at the expense
+of performances
+More specically the methods and architectures pre
+sented in this paper o	er generic solutions to a large num
+ber of problems encountered in pattern recognition sys
+tems
+ Feature extraction is traditionally a xed transform
+generally derived from some expert prior knowledge about
+the task This relies on the probably incorrect assumption
+that the human designer is able to capture all the rele vant information in the input We have shown that the
+application of GradientBased Learning to Convolutional
+Neural Networks allows to learn appropriate features from
+examples The success of this approach was demonstted
+in extensive comparative digit recognition experiments on
+the NIST database
+ Segmentation and recognition of ob jects in images can
+not be completely decoupled Instead of taking hard seg
+mentation decisions too early we have used Heuristic Over
+Segmentation to generate and evaluate a large number of
+hypotheses in parallel postponing any decision until the
+overall criterion is minimized
+ Hand truthing images to obtain segmented characters
+for training a character recognizer is expensive and does
+not take into account the way in which a whole document
+or sequence of characters will be recognized in particular
+the fact that some segmentation candidates may be wrong
+even though they may look like true characters Instead we train multimodule systems to optimize a global mea
+sure of performance which does not require time consum
+ing detailed handtruthing and yields signicantly better
+recognition performance because it allows to train these
+modules to cooperate towards a common goal
+ Ambiguities inherent in the segmentation character
+recognition and linguistic model should be integrated op
+timally Instead of using a sequence of taskdependent
+heuristics to combine these sources of information we
+have proposed a unied framework in which generalized
+transduction methods are applied to graphs representing a weighted set of hypotheses about the input The success of
+this approach was demonstrated with a commercially de
+ployed check reading system that reads millions of business
+and personal checks per day the generalized transduction
+engine resides in only a few hundred lines of code
+ Traditional recognition systems rely on many hand
+crafted heuristics to isolate individually recognizable ob
+jects The promising Space Displacement Neural Network
+approach draws on the robustness and eciency of Con volutional Neural Networks to avoid explicit segmentation
+altogether Simultaneous automatic learning of segmenta
+tion and recognition can be achieved with GradientBased
+Learning methods
+This paper presents a small number of examples of graph
+transformer modules but it is clear that the concept can be
+applied to many situations where the domain knowledge or
+the state information can be represented by graphs This is
+the case in many audio signal recognition tasks and visual
+scene analysis applications Future work will attempt to
+apply Graph Transformer Networks to such problems with
+the hope of allowing more reliance on automatic learning
+and less on detailed engineering
+Appendices
+A Preconditions for faster convergence
+As seen before the squashing function used in our Con volutional Networks is f a  A tanhSa Symmetric
+functions are believed to yield faster convergence although
+the learning can become extremely slow if the weights are
+too small The cause of this problem is that in weight space
+the origin is a xed point of the learning dynamics and
+PROC OF THE IEEE NOVEMBER  	
+although it is a saddle point it is attractive in almost all
+directions 
+ For our simulations we use A  
+and S  
+
+see 
+ 
+ With this choice of parame
+ters the equalities f    and f    are satised
+The rationale behind this is that the overall gain of the
+squashing transformation is around  in normal operat
+ing conditions and the interpretation of the state of the
+network is simplied Moreover the absolute value of the
+second derivative of f is a maximum at  and  which
+improves the convergence towards the end of the learning
+session This particular choice of parameters is merely a
+convenience and does not a	ect the result
+Before training the weights are initialized with random
+values using a uniform distribution between Fi and
+Fi where Fi is the number of inputs fanin of the unit
+which the connection belongs to Since several connections
+share a weight this rule could be dicult to apply but in
+our case all connections sharing a same weight belong to
+units with identical fanins The reason for dividing by the
+fanin is that we would like the initial standard deviation
+of the weighted sums to be in the same range for each
+unit and to fall within the normal operating region of the
+sigmoid If the initial weights are too small the gradients
+are very small and the learning is slow If they are too
+large the sigmoids are saturated and the gradient is also very small The standard deviation of the weighted sum
+scales like the square root of the number of inputs when
+the inputs are independent and it scales linearly with the number of inputs if the inputs are highly correlated We
+chose to assume the second hypothesis since some units
+receive highly correlated signals
+B Stochastic Gradient vs Batch Gradient
+GradientBased Learning algorithms can use one of two
+classes of methods to update the parameters The rst
+method dubbed Batch Gradient
+ is the classical one the
+gradients are accumulated over the entire training set and
+the parameters are updated after the exact gradient has
+been so computed In the second method called Stochas
+tic Gradient
+ a partial or noisy gradient is evaluated on
+the basis of one single training sample or a small num
+ber of samples and the parameters are updated using
+this approximate gradient The training samples can be
+selected randomly or according to a properly randomized
+sequence In the stochastic version the gradient estimates
+are noisy but the parameters are updated much more often
+than with the batch version An empirical result of con
+siderable practical importance is that on tasks with large
+redundant data sets the stochastic version is considerably
+faster than the batch version sometimes by orders of mag
+nitude 
+ Although the reasons for this are not totally
+understood theoretically an intuitive explanation can be
+found in the following extreme example Let us take an
+example where the training database is composed of two
+copies of the same subset Then accumulating the gradient
+over the whole set would cause redundant computations
+to be performed On the other hand running Stochas
+tic Gradient once on this training set would amount to
+performing two complete learning iterations over the small
+subset This idea can be generalized to training sets where
+there exist no precise repetition of the same pattern but
+where some redundancy is present In fact stochastic up
+date must be better when there is redundancy ie when a
+certain level of generalization is expected
+Many authors have claimed that secondorder meth
+ods should be used in lieu of gradient descent for neu
+ral net training The literature abounds with recom
+mendations 
+ for classical secondorder methods such
+as the GaussNewton or LevenbergMarquardt algorithms
+for QuasiNewton methods such as the BroydenFletcher
+GoldfarbShanno method BFGS Limitedstorage BFGS
+or for various versions of the Conjugate Gradients CG
+method Unfortunately all of the above methods are un
+suitable for training large neural networks on large data
+sets The GaussNewton and LevenbergMarquardt meth
+ods require ON
+ operations per update where N is
+the number of parameters which makes them impracti
+cal for even moderate size networks QuasiNewton meth
+ods require only
+ ON
+ operations per update but that
+still makes them impractical for large networks Limited
+Storage BFGS and Conjugate Gradient require only ON
+operations per update so they would appear appropriate
+Unfortunately their convergence speed relies on an accu
+rate evaluation of successive conjugate descent directions
+
+which only makes sense in batch
+ mode For large data
+sets the speedup brought by these methods over regular
+batch gradient descent cannot match the enormous speed
+up brought by the use of stochastic gradient Several au
+thors have attempted to use Conjugate Gradient with small
+batches or batches of increasing sizes 
+ 
+ but those
+attempts have not yet been demonstrated to surpass a care
+fully tuned stochastic gradient Our experiments were per
+formed with a stochastic method that scales the parameter
+axes so as to minimize the eccentricity of the error surface
+C Stochastic Diagonal LevenbergMarquardt
+Owing to the reasons given in Appendix B we prefer to
+update the weights after each presentation of a single pat
+tern in accordance with stochastic update methods The
+patterns are presented in a constant random order and the
+training set is typically repeated  times
+Our update algorithm is dubbed the Stochastic Diagonal
+LevenbergMarquardt method where an individual learning
+rate step size is computed for each parameter weight
+before each pass through the training set 
+ 
+ 
+
+These learning rates are computed using the diagonal terms
+of an estimate of the GaussNewton approximation to the
+Hessian second derivative matrix This algorithm is not
+believed to bring a tremendous increase in learning speed
+but it converges reliably without requiring extensive ad
+justments of the learning parameters It corrects ma jor ill
+conditioning of the loss function that are due to the pecu
+liarities of the network architecture and the training data
+The additional cost of using this procedure over standard
+stochastic gradient descent is negligible
+At each learning iteration a particular parameter wk is
+PROC OF THE IEEE NOVEMBER  	
+updated according to the following stochastic update rule
+wk  wk  k
+Ep wk
+ 
+where Ep
+is the instantaneous loss function for pattern p In Convolutional Neural Networks because of the weight
+sharing the partial derivative
+Ep wk
+is the sum of the partial
+derivatives with respect to the connections that share the
+parameter wk  Ep wk  X
+ijVk Ep uij
+
+where uij is the connection weight from unit j to unit i Vk
+is the set of unit index pairs i j such that the connection
+between i and j share the parameter wk  ie
+uij  wk i j  Vk 
+As stated previously the step sizes k are not constant but
+are function of the second derivative of the loss function
+along the axis wk 
+k 
+	
+
+  hkk
+
+where 
+ is a handpicked constant and hkk is an estimate
+of the second derivative of the loss function E with re
+spect to wk  The larger hkk  the smaller the weight update
+The parameter 
+ prevents the step size from becoming too
+large when the second derivative is small very much like
+the modeltrust
+ methods and the LevenbergMarquardt
+methods in nonlinear optimization 
+ The exact formula
+to compute hkk from the second derivatives with respect
+to the connection weights is
+hkk  X
+ijVk X
+klVk E
+uij ukl
+
+However we make three approximations The rst approx
+imation is to drop the o	diagonal terms of the Hessian
+with respect to the connection weights in the above equa
+tion
+hkk  X
+ijVk E
+u
+ij
+
+Naturally the terms E
+u
+ij are the average over the training
+set of the local second derivatives
+E
+u
+ij 
+
+P X
+P
+p
+Ep u
+ij
+
+Those local second derivatives with respect to connection weights can be computed from local second derivatives with
+respect to the total input of the downstream unit
+Ep u
+ij 
+Ep a
+i
+x
+j 
+where xj is the state of unit j and Ep a
+i is the second
+derivative of the instantaneous loss function with respect to
+the total input to unit i denoted ai Interestingly there is
+an ecient algorithm to compute those second derivatives
+which is very similar to the backpropagation procedure
+used to compute the rst derivatives 
+ 
+
+Ep a
+i  f
+aiX
+k
+u
+ki
+Ep a
+k
+ f
+ai Ep xi
+
+Unfortunately using those derivatives leads to wellknown
+problems associated with every Newtonlike algorithm
+these terms can be negative and can cause the gradient
+algorithm to move uphill instead of downhill Therefore
+our second approximation is a wellknown trick called the
+GaussNewton approximation which guarantees that the
+second derivative estimates are nonnegative The Gauss
+Newton approximation essentially ignores the nonlinearity
+of the estimated function the Neural Network in our case
+but not that of the loss function The backpropagation
+equation for GaussNewton approximations of the second
+derivatives is
+Ep a
+i  f
+aiX
+k
+u
+ki
+Ep a
+k
+
+This is very similar to the formula for backpropagating the
+rst derivatives except that the sigmoids derivative and
+the weight values are squared The righthand side is a sum
+of products of nonnegative terms therefore the lehand
+side term is nonnegative
+The third approximation we make is that we do not run
+the average in Equation  over the entire training set but
+run it on a small subset of the training set instead In
+addition the reestimation does not need to be done of
+ten since the second order properties of the error surface
+change rather slowly In the experiments described in this
+paper we reestimate the hkk on  patterns before each
+training pass through the training set Since the size of the
+training set is  the additional cost of reestimating
+the hkk is negligible The estimates are not particularly
+sensitive to the particular subset of the training set used in
+the averaging This seems to suggest that the secondorder
+properties of the error surface are mainly determined by
+the structure of the network rather than by the detailed
+statistics of the samples This algorithm is particularly use
+ful for sharedweight networks because the weight sharing
+creates illconditionning of the error surface Because of
+the sharing one single parameter in the rst few layers can
+have an enormous inuence on the output Consequently the second derivative of the error with respect to this pa
+rameter may be very large while it can be quite small for
+other parameters elsewhere in the network The above al
+gorithm compensates for that phenomenon
+Unlike most other secondorder acceleration methods for
+backpropagation the above method works in stochastic
+mode It uses a diagonal approximation of the Hessian
+Like the classical LevenbergMarquardt algorithm it uses a
+safety
+ factor 
+ to prevent the step sizes from getting too
+large if the second derivative estimates are small Hence
+the method is called the Stochastic Diagonal Levenberg
+Marquardt method
