@@ -13,12 +13,17 @@ peft_config = LoraConfig(
     lora_dropout=0.1,
     bias="none",
     task_type="CAUSAL_LM",
-    target_modules=["q_proj", "v_proj"])
+    target_modules=["q_proj","k_proj","v_proj",
+                    "o_proj",
+                    "gate_proj",
+                    "up_proj",
+                    "down_proj",
+                    "lm_head"])
 # Load model and tokenizer
 path = 'openbmb/MiniCPM-2B-dpo-fp16'
 tokenizer = AutoTokenizer.from_pretrained(path)
 tokenizer.pad_token = tokenizer.eos_token  # Set pad token
-model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, device_map='cuda', trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, load_in_4bit = True,device_map='cuda', trust_remote_code=True)
 model = get_peft_model(model, peft_config)
 
 
