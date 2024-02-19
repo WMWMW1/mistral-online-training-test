@@ -4,12 +4,27 @@ import torch
 import numpy as np
 from SupervisedDataset import SupervisedDataset
 torch.manual_seed(0)
+from peft import LoraConfig, TaskType
+from peft import get_peft_model
 
+
+peft_config = LoraConfig(
+    r=8, lora_alpha=32, 
+    lora_dropout=0.1,
+    bias="none",
+    task_type="CAUSAL_LM",
+    target_modules=["q_proj","k_proj","v_proj",
+                    "o_proj",
+                    "gate_proj",
+                    "up_proj",
+                    "down_proj",
+                    "lm_head"])
 # Load model and tokenizer
 path = 'openbmb/MiniCPM-2B-dpo-fp16'
 tokenizer = AutoTokenizer.from_pretrained(path)
 tokenizer.pad_token = tokenizer.eos_token  # Set pad token
-model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, device_map='cuda', trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, load_in_4bit = True,device_map='cuda', trust_remote_code=True)
+model = get_peft_model(model, peft_config)
 
 
 data_path = 'data.json'
@@ -41,6 +56,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=dataset,  # Your custom dataset
     tokenizer=tokenizer,
+    
 )
 
 # Start training

@@ -22,10 +22,10 @@ you need to respond in the format in json:
 """
 
 
-prompt="""
-hello
+# prompt="""
+# hello
 
-"""
+# """
 chat1 = [
     {"role": "user", "content": "who are you?"},
     {"role": "assistant", "content": "My name is."}
@@ -37,7 +37,7 @@ chat2 = [
 
 dataset = Dataset.from_dict({"chat": [chat1, chat2]})
 dataset = dataset.map(lambda x: {"formatted_chat": tokenizer.apply_chat_template(x["chat"], tokenize=False, add_generation_prompt=False)})
-print(dataset['formatted_chat'][0])
+# print(dataset['formatted_chat'][0])
 
 
 
@@ -65,7 +65,7 @@ trainer = Trainer(
     train_dataset=train_dataset,
     tokenizer=tokenizer,
 )
-trainer.train()
+# trainer.train()
 # messages=[]
 # modelinput= input("input from user: ")
 # responds, history = model.chat(tokenizer,modelinput , temperature=0.8, top_p=0.8)
@@ -79,5 +79,5 @@ trainer.train()
 #     print(responds)
 #     print(history)
 #     messages.append(history)
-# # trainer.save_model('my-model')
+trainer.save_model('my-model')
 
