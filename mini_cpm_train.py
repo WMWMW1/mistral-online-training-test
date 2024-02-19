@@ -6,7 +6,7 @@ from SupervisedDataset import SupervisedDataset
 torch.manual_seed(0)
 
 # Load model and tokenizer
-path = 'openbmb/MiniCPM-2B-dpo-bf16'
+path = 'openbmb/MiniCPM-2B-dpo-fp16'
 tokenizer = AutoTokenizer.from_pretrained(path)
 tokenizer.pad_token = tokenizer.eos_token  # Set pad token
 model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, device_map='cuda', trust_remote_code=True)
